@@ -64,7 +64,7 @@ pub fn elegivel(
         }
         OracaoInicial | OracaoFinal => (homem_batizado(p), false),
         Tesouros | Joias | VidaCrista | MinisterioConsideracao => (anciao_ou_servo(p), false),
-        Leitura => (p.sexo == 'm', false),
+        Leitura => (p.sexo == 'm' && (config.usar_anciaos_leitura || !p.anciao), false),
         MinisterioDemonstracao => (p.sexo == 'f', false),
         MinisterioDiscurso => (homem_batizado(p), false),
         VidaCristaAncioes | NecessidadesLocais => (p.anciao, false),

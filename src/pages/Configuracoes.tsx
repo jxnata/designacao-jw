@@ -95,6 +95,14 @@ export default function Configuracoes() {
           />
           Usar servos ministeriais no Estudo Bíblico de Congregação
         </label>
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={config.usar_anciaos_leitura}
+            onChange={(e) => setConfig({ ...config, usar_anciaos_leitura: e.target.checked })}
+          />
+          Usar anciãos na Leitura da Bíblia
+        </label>
       </div>
 
       <button className="rounded bg-teal-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-800">

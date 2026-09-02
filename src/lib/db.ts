@@ -89,6 +89,7 @@ function toConfig(r: Record<string, unknown>): Config {
     transicao_min: r.transicao_min as number,
     usar_servos_presidencia: bool(r.usar_servos_presidencia),
     usar_servos_estudo_biblico: bool(r.usar_servos_estudo_biblico),
+    usar_anciaos_leitura: bool(r.usar_anciaos_leitura),
   };
 }
 
@@ -101,7 +102,7 @@ export async function getConfig(): Promise<Config> {
 export async function salvarConfig(c: Config): Promise<void> {
   const db = await getDb();
   await db.execute(
-    `UPDATE config SET congregacao=$1, dia_semana=$2, horario=$3, transicao_min=$4, usar_servos_presidencia=$5, usar_servos_estudo_biblico=$6 WHERE id=1`,
+    `UPDATE config SET congregacao=$1, dia_semana=$2, horario=$3, transicao_min=$4, usar_servos_presidencia=$5, usar_servos_estudo_biblico=$6, usar_anciaos_leitura=$7 WHERE id=1`,
     [
       c.congregacao,
       c.dia_semana,
@@ -109,6 +110,7 @@ export async function salvarConfig(c: Config): Promise<void> {
       c.transicao_min,
       int(c.usar_servos_presidencia),
       int(c.usar_servos_estudo_biblico),
+      int(c.usar_anciaos_leitura),
     ],
   );
 }
@@ -327,7 +329,7 @@ export async function importarBackup(b: BackupCompleto): Promise<void> {
     await db.execute(`DELETE FROM pessoas`);
 
     await db.execute(
-      `UPDATE config SET congregacao=$1, dia_semana=$2, horario=$3, transicao_min=$4, usar_servos_presidencia=$5, usar_servos_estudo_biblico=$6 WHERE id=1`,
+      `UPDATE config SET congregacao=$1, dia_semana=$2, horario=$3, transicao_min=$4, usar_servos_presidencia=$5, usar_servos_estudo_biblico=$6, usar_anciaos_leitura=$7 WHERE id=1`,
       [
         b.config.congregacao,
         b.config.dia_semana,
@@ -335,6 +337,7 @@ export async function importarBackup(b: BackupCompleto): Promise<void> {
         b.config.transicao_min,
         int(b.config.usar_servos_presidencia ?? true),
         int(b.config.usar_servos_estudo_biblico ?? true),
+        int(b.config.usar_anciaos_leitura ?? false),
       ],
     );
 

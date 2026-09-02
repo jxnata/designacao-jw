@@ -72,6 +72,10 @@ pub struct DesignacaoResultado {
 pub struct ConfiguracaoDesignacao {
     pub usar_servos_presidencia: bool,
     pub usar_servos_estudo_biblico: bool,
+    /// Se anciãos podem ser designados para a Leitura da Bíblia — em muitas
+    /// congregações essa parte é reservada a publicadores/estudantes em
+    /// desenvolvimento, então o default é excluir anciãos.
+    pub usar_anciaos_leitura: bool,
 }
 
 impl Default for ConfiguracaoDesignacao {
@@ -79,6 +83,7 @@ impl Default for ConfiguracaoDesignacao {
         Self {
             usar_servos_presidencia: true,
             usar_servos_estudo_biblico: true,
+            usar_anciaos_leitura: false,
         }
     }
 }
@@ -383,5 +388,48 @@ mod tests {
             gerar_atribuicoes(&pessoas, &[], &partes, ConfiguracaoDesignacao::default());
         assert_eq!(resultado[0].pessoa_id, Some(1));
         assert_eq!(resultado[1].pessoa_id, Some(1));
+    }
+
+    fn parte_leitura(id: &str, semana_ordinal: i64) -> ParteParaDesignar {
+        ParteParaDesignar {
+            parte_id: id.to_string(),
+            semana_ordinal,
+            tipo: TipoParte::Leitura,
+            tem_ajudante: false,
+        }
+    }
+
+    fn homem_nao_anciao(id: i64, nome: &str) -> Pessoa {
+        Pessoa {
+            anciao: false,
+            servo: false,
+            ..pessoa(id, nome)
+        }
+    }
+
+    /// Com `usar_anciaos_leitura: false` (default), ancião nunca deve ser
+    /// escolhido para a Leitura da Bíblia enquanto houver outro homem.
+    #[test]
+    fn exclui_anciaos_da_leitura_por_padrao() {
+        let pessoas = vec![pessoa(1, "Anciao"), homem_nao_anciao(2, "Publicador")];
+        let partes = vec![parte_leitura("s1", 1)];
+
+        let resultado =
+            gerar_atribuicoes(&pessoas, &[], &partes, ConfiguracaoDesignacao::default());
+        assert_eq!(resultado[0].pessoa_id, Some(2));
+    }
+
+    /// Com `usar_anciaos_leitura: true`, ancião volta a ser elegível.
+    #[test]
+    fn permite_anciaos_na_leitura_quando_configurado() {
+        let pessoas = vec![pessoa(1, "Anciao")];
+        let partes = vec![parte_leitura("s1", 1)];
+        let config = ConfiguracaoDesignacao {
+            usar_anciaos_leitura: true,
+            ..ConfiguracaoDesignacao::default()
+        };
+
+        let resultado = gerar_atribuicoes(&pessoas, &[], &partes, config);
+        assert_eq!(resultado[0].pessoa_id, Some(1));
     }
 }

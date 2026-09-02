@@ -86,5 +86,13 @@ pub fn migrations() -> Vec<Migration> {
             ALTER TABLE config ADD COLUMN usar_servos_estudo_biblico INTEGER NOT NULL DEFAULT 1;
         "#,
         },
+        Migration {
+            version: 3,
+            description: "opcao de anciaos na leitura da biblia",
+            kind: MigrationKind::Up,
+            sql: r#"
+            ALTER TABLE config ADD COLUMN usar_anciaos_leitura INTEGER NOT NULL DEFAULT 0;
+        "#,
+        },
     ]
 }

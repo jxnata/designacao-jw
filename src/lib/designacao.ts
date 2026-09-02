@@ -121,6 +121,7 @@ export async function gerarPreview(
     config: {
       usar_servos_presidencia: config.usar_servos_presidencia,
       usar_servos_estudo_biblico: config.usar_servos_estudo_biblico,
+      usar_anciaos_leitura: config.usar_anciaos_leitura,
     },
   });
 

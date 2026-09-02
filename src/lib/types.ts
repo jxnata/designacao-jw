@@ -59,6 +59,7 @@ export interface Config {
   transicao_min: number;
   usar_servos_presidencia: boolean;
   usar_servos_estudo_biblico: boolean;
+  usar_anciaos_leitura: boolean;
 }
 
 export interface ParteWeb {
