@@ -10,10 +10,9 @@
   --gold: #b8893d;
   --focus: #1a6b66;
   --radius: 14px;
-  --shadow: 0 18px 40px rgba(16, 40, 38, 0.08);
   --font-sans: "Outfit", system-ui, sans-serif;
   --font-serif: "Source Serif 4", Georgia, serif;
-  --wrap: 1080px;
+  --wrap: 1180px;
 }
 
 *,
@@ -97,7 +96,6 @@ a:hover {
 
 .brand img {
   border-radius: 9px;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset;
 }
 
 .nav {
@@ -125,9 +123,14 @@ a:hover {
 
 .hero-grid {
   display: grid;
-  grid-template-columns: 1.05fr 0.95fr;
-  gap: 3rem;
+  grid-template-columns: 0.85fr 1.25fr;
+  gap: 2rem;
   align-items: center;
+}
+
+.hero-visual {
+  min-width: 0;
+  justify-self: stretch;
 }
 
 .hero-kicker {
@@ -202,94 +205,18 @@ a:hover {
   color: var(--teal-deep);
 }
 
-/* Schedule card — the one bold visual */
+/* Hero screenshot */
 
-.schedule-card {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: calc(var(--radius) + 4px);
-  box-shadow: var(--shadow);
-  overflow: hidden;
-  transform: rotate(0.6deg);
-}
-
-.schedule-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.75rem;
-  align-items: center;
-  padding: 1rem 1.15rem;
-  background: linear-gradient(180deg, var(--mint), #f7fbfa);
-  border-bottom: 1px solid var(--line);
-  font-weight: 600;
-  font-size: 0.95rem;
-}
-
-.pill {
-  flex-shrink: 0;
-  border-radius: 999px;
-  padding: 0.2rem 0.65rem;
-  background: #fff;
-  border: 1px solid var(--line);
-  color: var(--teal-deep);
-  font-size: 0.78rem;
-  font-weight: 600;
-}
-
-.schedule-list {
-  list-style: none;
+.hero-shot {
   margin: 0;
-  padding: 0.35rem 0;
+  border-radius: calc(var(--radius) + 4px);
+  overflow: hidden;
 }
 
-.schedule-list li {
-  display: grid;
-  grid-template-columns: 4.2rem 1fr;
-  gap: 0.75rem;
-  padding: 0.72rem 1.15rem;
-  border-bottom: 1px dashed color-mix(in srgb, var(--line) 80%, transparent);
-}
-
-.schedule-list li:last-child {
-  border-bottom: 0;
-}
-
-.schedule-list .time {
-  font-variant-numeric: tabular-nums;
-  color: var(--gold);
-  font-weight: 600;
-  font-size: 0.92rem;
-  padding-top: 0.12rem;
-}
-
-.schedule-list .part {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  min-width: 0;
-}
-
-.schedule-list strong {
-  font-weight: 600;
-  font-size: 0.98rem;
-}
-
-.schedule-list em {
-  font-style: normal;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.muted-row {
-  background: color-mix(in srgb, var(--mint) 35%, white);
-}
-
-.schedule-foot {
-  padding: 0.85rem 1.15rem 1rem;
-  border-top: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 0.88rem;
-  background: #fbfcfb;
+.hero-shot img {
+  width: 100%;
+  display: block;
+  background: #eef4f3;
 }
 
 /* Sections */
@@ -362,27 +289,31 @@ a:hover {
 .screens {
   margin-top: 2.25rem;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 1.25rem;
 }
 
 .screen {
   margin: 0;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  overflow: hidden;
-  box-shadow: 0 8px 24px rgba(16, 40, 38, 0.05);
+  display: grid;
+  gap: 0.7rem;
+  padding-bottom: 0.75rem;
 }
 
 .screen img {
   width: 100%;
+  aspect-ratio: 1600 / 1112;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+  border-radius: var(--radius);
   background: #eef4f3;
-  border-bottom: 1px solid var(--line);
 }
 
 .screen figcaption {
-  padding: 1rem 1.1rem 1.15rem;
+  margin: 0 1.35rem 0.35rem;
+  padding: 0.1rem 0 0.1rem 0.9rem;
+  border-left: 3px solid var(--teal);
   color: var(--muted);
   font-size: 0.95rem;
 }
@@ -390,8 +321,8 @@ a:hover {
 .screen figcaption strong {
   display: block;
   color: var(--ink);
-  margin-bottom: 0.25rem;
-  font-size: 1rem;
+  margin-bottom: 0.2rem;
+  font-size: 1.05rem;
 }
 
 /* Steps — real sequence */
@@ -402,21 +333,21 @@ a:hover {
   list-style: none;
   counter-reset: step;
   display: grid;
-  gap: 0.85rem;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem 2rem;
 }
 
 .steps li {
   counter-increment: step;
   display: grid;
   grid-template-columns: 2.5rem 1fr;
-  gap: 0.9rem;
+  column-gap: 1rem;
+  row-gap: 0.25rem;
   align-items: start;
-  padding: 1rem 0;
-  border-bottom: 1px solid var(--line);
-}
-
-.steps li:last-child {
-  border-bottom: 0;
+  padding: 1.15rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
 }
 
 .steps li::before {
@@ -430,16 +361,20 @@ a:hover {
   color: #fff;
   font-weight: 700;
   font-size: 0.95rem;
+  grid-row: 1 / span 2;
 }
 
 .steps strong {
   display: block;
   font-size: 1.05rem;
-  margin-bottom: 0.15rem;
+  line-height: 1.35;
+  padding-top: 0.35rem;
 }
 
 .steps span {
   color: var(--muted);
+  grid-column: 2;
+  line-height: 1.5;
 }
 
 /* Download */
@@ -575,6 +510,7 @@ a:hover {
   .hero-grid,
   .feature-list,
   .screens,
+  .steps,
   .download-grid,
   .footer-inner {
     grid-template-columns: 1fr;
@@ -590,7 +526,7 @@ a:hover {
     padding-right: 0 !important;
   }
 
-  .schedule-card {
+  .hero-shot {
     transform: none;
   }
 
