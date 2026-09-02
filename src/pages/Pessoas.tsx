@@ -1,4 +1,5 @@
 import { confirm } from "@tauri-apps/plugin-dialog";
+import { Pencil, Save, Trash2, UserPlus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { excluirPessoa, getConfig, listarPessoas, salvarPessoa } from "../lib/db";
 import type { Config, Pessoa } from "../lib/types";
@@ -136,14 +137,19 @@ export default function Pessoas() {
                       )}
                     </td>
                     <td className="px-3 py-2 text-right">
-                      <button className="text-xs text-teal-700 hover:underline" onClick={() => editar(p)}>
-                        Editar
+                      <button
+                        className="rounded p-1 text-teal-700 hover:bg-teal-50"
+                        onClick={() => editar(p)}
+                        title="Editar pessoa"
+                      >
+                        <Pencil className="size-4" />
                       </button>
                       <button
-                        className="ml-3 text-xs text-red-600 hover:underline"
+                        className="ml-1 rounded p-1 text-red-600 hover:bg-red-50"
                         onClick={() => excluir(p)}
+                        title="Excluir pessoa"
                       >
-                        Excluir
+                        <Trash2 className="size-4" />
                       </button>
                     </td>
                   </tr>
@@ -165,7 +171,12 @@ export default function Pessoas() {
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold">{form.id ? "Editar pessoa" : "Nova pessoa"}</h2>
           {form.id && (
-            <button type="button" className="text-xs text-slate-500 hover:underline" onClick={novaPessoa}>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 text-xs text-slate-500 hover:underline"
+              onClick={novaPessoa}
+            >
+              <X className="size-3.5" />
               cancelar edição
             </button>
           )}
@@ -248,9 +259,19 @@ export default function Pessoas() {
 
         <button
           type="submit"
-          className="w-full rounded bg-teal-700 py-1.5 text-sm font-medium text-white hover:bg-teal-800"
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded bg-teal-700 py-1.5 text-sm font-medium text-white hover:bg-teal-800"
         >
-          {form.id ? "Salvar alterações" : "Adicionar pessoa"}
+          {form.id ? (
+            <>
+              <Save className="size-4" />
+              Salvar alterações
+            </>
+          ) : (
+            <>
+              <UserPlus className="size-4" />
+              Adicionar pessoa
+            </>
+          )}
         </button>
       </form>
     </div>

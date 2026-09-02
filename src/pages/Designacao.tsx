@@ -2,6 +2,22 @@ import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  ArrowLeft,
+  ArrowRightLeft,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Eye,
+  EyeOff,
+  Loader2,
+  Pencil,
+  Printer,
+  Save,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
+import {
   atualizarStatusSemana,
   excluirSemana,
   getConfig,
@@ -11,7 +27,7 @@ import {
   salvarDesignacoes,
 } from "../lib/db";
 import { carregarPreviewExistente, gerarPreview, montarUnidades } from "../lib/designacao";
-import { elegivelAjudante, ordenarParaSelect } from "../lib/regras";
+import { elegivel, elegivelAjudante } from "../lib/regras";
 import { CORES_SECAO, SECAO_POR_TIPO } from "../lib/secoes";
 import { ROTULO_TIPO } from "../lib/types";
 import type { Config, ItemPreview, Pessoa, Semana } from "../lib/types";
@@ -28,7 +44,10 @@ export default function Designacao() {
   const [modoPreview, setModoPreview] = useState<"gerar" | "editar">("gerar");
   const [mostrarTodos, setMostrarTodos] = useState<Set<string>>(new Set());
   const [erro, setErro] = useState<string | null>(null);
+  const [pagina, setPagina] = useState(1);
   const navigate = useNavigate();
+
+  const POR_PAGINA = 10;
 
   async function recarregar() {
     setSemanas(await listarSemanas());
@@ -40,7 +59,28 @@ export default function Designacao() {
     recarregar();
   }, []);
 
+  const semanasOrdenadas = useMemo(
+    () => [...semanas].sort((a, b) => b.ordinal - a.ordinal),
+    [semanas],
+  );
+  const totalPaginas = Math.max(1, Math.ceil(semanasOrdenadas.length / POR_PAGINA));
+  const semanasPagina = useMemo(
+    () => semanasOrdenadas.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA),
+    [semanasOrdenadas, pagina],
+  );
+
+  useEffect(() => {
+    if (pagina > totalPaginas) setPagina(totalPaginas);
+  }, [pagina, totalPaginas]);
+
   async function buscarSemanas() {
+    if (
+      !confirm(
+        `Isso vai buscar ${quantidade === 1 ? "a próxima semana" : `as próximas ${quantidade} semanas`} diretamente do jw.org. Pode levar alguns instantes. Continuar?`,
+      )
+    ) {
+      return;
+    }
     const ultima = [...semanas].sort((a, b) => b.ordinal - a.ordinal)[0];
     setErro(null);
     setAdicionando(true);
@@ -52,6 +92,7 @@ export default function Designacao() {
       });
       await importarSemanas(semanasWeb as never);
       await recarregar();
+      setPagina(1);
     } catch (e) {
       setErro(String(e));
     } finally {
@@ -190,16 +231,27 @@ export default function Designacao() {
           </h1>
           <div className="flex gap-2">
             <button
-              className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100"
+              className="inline-flex items-center gap-1.5 rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100"
               onClick={() => setPreview(null)}
             >
+              <ArrowLeft className="size-4" />
               Voltar
             </button>
             <button
-              className="rounded bg-teal-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-800"
+              className="inline-flex items-center gap-1.5 rounded bg-teal-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-800"
               onClick={confirmarEGerar}
             >
-              {modoPreview === "editar" ? "Salvar alterações" : "Confirmar e gerar"}
+              {modoPreview === "editar" ? (
+                <>
+                  <Save className="size-4" />
+                  Salvar alterações
+                </>
+              ) : (
+                <>
+                  <Check className="size-4" />
+                  Confirmar e gerar
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -248,25 +300,37 @@ export default function Designacao() {
         <h1 className="text-lg font-semibold">Designação</h1>
         <div className="flex gap-2">
           <button
-            className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50"
             onClick={imprimirSelecionadas}
             disabled={tipoSelecao !== "com"}
           >
+            <Printer className="size-4" />
             Imprimir Designações
           </button>
           <button
-            className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50"
             onClick={editarSelecionadas}
             disabled={tipoSelecao !== "com" || gerandoPreview}
           >
+            <Pencil className="size-4" />
             Editar Designações
           </button>
           <button
-            className="rounded bg-teal-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-800 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded bg-teal-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-800 disabled:opacity-50"
             onClick={gerarPreviewClick}
             disabled={tipoSelecao !== "sem" || gerandoPreview}
           >
-            {gerandoPreview ? "Gerando…" : "Gerar Designações"}
+            {gerandoPreview ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Gerando…
+              </>
+            ) : (
+              <>
+                <Sparkles className="size-4" />
+                Gerar Designações
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -285,7 +349,7 @@ export default function Designacao() {
             </tr>
           </thead>
           <tbody>
-            {semanas.map((s) => (
+            {semanasPagina.map((s) => (
               <tr key={s.id} className="border-t border-slate-100">
                 <td className="px-3 py-2">
                   <input
@@ -304,14 +368,19 @@ export default function Designacao() {
                 <td className="px-3 py-2 text-right">
                   {temDesignacao(s) ? (
                     <button
-                      className="text-xs text-teal-700 hover:underline"
+                      className="rounded p-1 text-teal-700 hover:bg-teal-50"
                       onClick={() => editarSemanas([s.id])}
+                      title="Editar designações"
                     >
-                      editar
+                      <Pencil className="size-4" />
                     </button>
                   ) : (
-                    <button className="text-xs text-red-600 hover:underline" onClick={() => excluir(s.id)}>
-                      excluir
+                    <button
+                      className="rounded p-1 text-red-600 hover:bg-red-50"
+                      onClick={() => excluir(s.id)}
+                      title="Excluir semana"
+                    >
+                      <Trash2 className="size-4" />
                     </button>
                   )}
                 </td>
@@ -320,7 +389,7 @@ export default function Designacao() {
             {semanas.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-3 py-6 text-center text-slate-400">
-                  Nenhuma semana importada ainda. Use o controle abaixo para buscar.
+                  Nenhuma semana importada ainda. Use o controle abaixo para carregar.
                 </td>
               </tr>
             )}
@@ -328,28 +397,64 @@ export default function Designacao() {
         </table>
       </div>
 
-      <div className="mt-3 flex items-center gap-2">
-        <span className="text-sm text-slate-600">Adicionar</span>
-        <input
-          type="number"
-          min={1}
-          max={8}
-          value={quantidade}
-          onChange={(e) => {
-            const valor = Number(e.target.value);
-            setQuantidade(Math.min(8, Math.max(1, Number.isNaN(valor) ? 1 : valor)));
-          }}
-          disabled={adicionando}
-          className="w-16 rounded border border-slate-300 px-2 py-1.5 text-sm disabled:opacity-50"
-        />
-        <span className="text-sm text-slate-600">semanas</span>
-        <button
-          className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50"
-          onClick={buscarSemanas}
-          disabled={adicionando}
-        >
-          {adicionando ? "Buscando…" : "Buscar"}
-        </button>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-slate-600">Adicionar</span>
+          <input
+            type="number"
+            min={1}
+            max={8}
+            value={quantidade}
+            onChange={(e) => {
+              const valor = Number(e.target.value);
+              setQuantidade(Math.min(8, Math.max(1, Number.isNaN(valor) ? 1 : valor)));
+            }}
+            disabled={adicionando}
+            className="w-16 rounded border border-slate-300 px-2 py-1.5 text-sm disabled:opacity-50"
+          />
+          <span className="text-sm text-slate-600">semanas</span>
+          <button
+            className="inline-flex items-center gap-1.5 rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50"
+            onClick={buscarSemanas}
+            disabled={adicionando}
+          >
+            {adicionando ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Carregando…
+              </>
+            ) : (
+              <>
+                <Download className="size-4" />
+                Carregar
+              </>
+            )}
+          </button>
+        </div>
+
+        {totalPaginas > 1 && (
+          <div className="flex items-center gap-2">
+            <button
+              className="rounded border border-slate-300 p-1.5 hover:bg-slate-100 disabled:opacity-40"
+              onClick={() => setPagina((p) => Math.max(1, p - 1))}
+              disabled={pagina <= 1}
+              title="Página anterior"
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+            <span className="text-sm text-slate-600">
+              Página {pagina} de {totalPaginas}
+            </span>
+            <button
+              className="rounded border border-slate-300 p-1.5 hover:bg-slate-100 disabled:opacity-40"
+              onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+              disabled={pagina >= totalPaginas}
+              title="Próxima página"
+            >
+              <ChevronRight className="size-4" />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -391,7 +496,11 @@ function LinhaPreview({
   config: Config | null;
 }) {
   const ehLeitorEstudo = item.tipo === "estudo_biblico";
-  const opcoes = mostrarTodos ? [...pessoas].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")) : ordenarParaSelect(item.tipo, pessoas);
+  const opcoes = (
+    mostrarTodos ? pessoas : pessoas.filter((p) => elegivel(item.tipo, p) || p.id === item.pessoa_id)
+  )
+    .slice()
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
   const pessoaEscolhida = item.pessoa_id ? pessoasPorId.get(item.pessoa_id) : null;
   const opcoesAjudante = ehLeitorEstudo
     ? pessoas
@@ -439,12 +548,7 @@ function LinhaPreview({
           disabled={!item.pessoa_id && !item.ajudante_id}
           title="Inverter designado e ajudante"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-4">
-            <path d="M17 3l4 4-4 4" />
-            <path d="M3 7h18" />
-            <path d="M7 21l-4-4 4-4" />
-            <path d="M21 17H3" />
-          </svg>
+          <ArrowRightLeft className="size-4" />
         </button>
       )}
 
@@ -465,11 +569,21 @@ function LinhaPreview({
 
       <button
         type="button"
-        className="text-xs text-slate-400 hover:text-slate-700"
+        className="inline-flex shrink-0 items-center gap-1 text-xs text-slate-400 hover:text-slate-700"
         onClick={onToggleMostrarTodos}
         title="Mostrar todas as pessoas, mesmo as não elegíveis"
       >
-        {mostrarTodos ? "só elegíveis" : "mostrar todos"}
+        {mostrarTodos ? (
+          <>
+            <EyeOff className="size-3.5" />
+            só elegíveis
+          </>
+        ) : (
+          <>
+            <Eye className="size-3.5" />
+            mostrar todos
+          </>
+        )}
       </button>
     </div>
   );

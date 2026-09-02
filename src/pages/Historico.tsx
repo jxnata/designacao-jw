@@ -58,7 +58,7 @@ export default function Historico() {
             <tbody>
               {porPessoa.map((p) => (
                 <tr key={p.nome} className="border-t border-slate-100">
-                  <td className="px-3 py-2 font-medium">{p.nome}</td>
+                  <td className="whitespace-nowrap px-3 py-2 font-medium">{p.nome}</td>
                   {tipos.map((t) => (
                     <td key={t} className="px-3 py-2 text-center text-slate-600">
                       {p.porTipo.get(t) ?? 0}

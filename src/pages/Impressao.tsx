@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { FileDown, Loader2, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { getConfig, listarDesignacoesPorSemana, listarPartes, listarPessoas, listarSemanas } from "../lib/db";
@@ -119,17 +120,28 @@ export default function Impressao() {
         <h1 className="text-lg font-semibold">Programação impressa</h1>
         <div className="flex items-center gap-2">
           <button
-            className="rounded border border-teal-700 px-4 py-1.5 text-sm font-medium text-teal-700 hover:bg-teal-50 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded border border-teal-700 px-4 py-1.5 text-sm font-medium text-teal-700 hover:bg-teal-50 disabled:opacity-50"
             onClick={gerarArquivosS89}
             disabled={!!gerando || totalS89 === 0}
             title={totalS89 === 0 ? "Nenhuma designação de leitura ou ministério encontrada" : undefined}
           >
-            {gerando ? `Gerando… ${gerando.atual}/${gerando.total}` : "Gerar S-89"}
+            {gerando ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Gerando… {gerando.atual}/{gerando.total}
+              </>
+            ) : (
+              <>
+                <FileDown className="size-4" />
+                Gerar S-89
+              </>
+            )}
           </button>
           <button
-            className="rounded bg-teal-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-800"
+            className="inline-flex items-center gap-1.5 rounded bg-teal-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-800"
             onClick={imprimir}
           >
+            <Printer className="size-4" />
             Imprimir / salvar PDF
           </button>
         </div>

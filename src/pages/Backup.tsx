@@ -1,5 +1,6 @@
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { Download, Loader2, Upload } from "lucide-react";
 import { useState } from "react";
 import { exportarBackup, importarBackup } from "../lib/db";
 import type { BackupCompleto } from "../lib/db";
@@ -62,9 +63,10 @@ export default function Backup() {
           Salva um arquivo .json com toda a configuração, pessoas, semanas, partes e designações.
         </p>
         <button
-          className="rounded bg-teal-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-800"
+          className="inline-flex items-center gap-1.5 rounded bg-teal-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-800"
           onClick={exportar}
         >
+          <Download className="size-4" />
           Exportar backup…
         </button>
       </div>
@@ -76,11 +78,21 @@ export default function Backup() {
           banco.
         </p>
         <button
-          className="rounded border border-red-300 px-4 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded border border-red-300 px-4 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
           onClick={importar}
           disabled={ocupado}
         >
-          {ocupado ? "Restaurando…" : "Restaurar backup…"}
+          {ocupado ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              Restaurando…
+            </>
+          ) : (
+            <>
+              <Upload className="size-4" />
+              Restaurar backup…
+            </>
+          )}
         </button>
       </div>
 

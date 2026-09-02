@@ -1,3 +1,4 @@
+import { Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getConfig, salvarConfig } from "../lib/db";
 import type { Config } from "../lib/types";
@@ -132,7 +133,8 @@ export default function Configuracoes() {
         </label>
       </div>
 
-      <button className="rounded bg-teal-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-800">
+      <button className="inline-flex items-center gap-1.5 rounded bg-teal-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-800">
+        <Save className="size-4" />
         Salvar
       </button>
       {salvo && <span className="ml-3 text-sm text-emerald-600">Salvo!</span>}

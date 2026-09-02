@@ -47,14 +47,3 @@ export function elegivelAjudante(
   }
   return p.sexo === sexoEstudante;
 }
-
-/** Ordena pessoas elegíveis primeiro (mantendo a ordem alfabética dentro de
- * cada grupo), para o `<select>` do preview. */
-export function ordenarParaSelect(tipo: TipoParte, pessoas: Pessoa[]): Pessoa[] {
-  return [...pessoas].sort((a, b) => {
-    const ea = elegivel(tipo, a) ? 0 : 1;
-    const eb = elegivel(tipo, b) ? 0 : 1;
-    if (ea !== eb) return ea - eb;
-    return a.nome.localeCompare(b.nome, "pt-BR");
-  });
-}

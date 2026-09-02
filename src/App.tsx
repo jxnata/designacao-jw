@@ -1,3 +1,4 @@
+import { CalendarCheck, Database, History, Settings, Users } from "lucide-react";
 import { HashRouter, NavLink, Navigate, Route, Routes } from "react-router-dom";
 import Pessoas from "./pages/Pessoas";
 import Designacao from "./pages/Designacao";
@@ -7,11 +8,11 @@ import Backup from "./pages/Backup";
 import Configuracoes from "./pages/Configuracoes";
 
 const abas = [
-  { to: "/designacao", label: "Designação" },
-  { to: "/pessoas", label: "Pessoas" },
-  { to: "/historico", label: "Histórico" },
-  { to: "/backup", label: "Backup" },
-  { to: "/configuracoes", label: "Configurações" },
+  { to: "/designacao", label: "Designação", icone: CalendarCheck },
+  { to: "/pessoas", label: "Pessoas", icone: Users },
+  { to: "/historico", label: "Histórico", icone: History },
+  { to: "/backup", label: "Backup", icone: Database },
+  { to: "/configuracoes", label: "Configurações", icone: Settings },
 ];
 
 export default function App() {
@@ -20,21 +21,19 @@ export default function App() {
       <div className="min-h-screen bg-slate-50 text-slate-900">
         <nav className="no-print sticky top-0 z-10 border-b border-slate-200 bg-white shadow-sm">
           <div className="mx-auto flex max-w-6xl items-center gap-1 px-4">
-            <span className="mr-4 py-3 text-sm font-semibold tracking-tight text-slate-700">
-              Designações — Vida e Ministério
-            </span>
             {abas.map((a) => (
               <NavLink
                 key={a.to}
                 to={a.to}
                 className={({ isActive }) =>
-                  `border-b-2 px-3 py-3 text-sm font-medium transition-colors ${
+                  `inline-flex items-center gap-1.5 border-b-2 px-3 py-3 text-sm font-medium transition-colors ${
                     isActive
                       ? "border-teal-700 text-teal-700"
                       : "border-transparent text-slate-500 hover:text-slate-800"
                   }`
                 }
               >
+                <a.icone className="size-4" />
                 {a.label}
               </NavLink>
             ))}
