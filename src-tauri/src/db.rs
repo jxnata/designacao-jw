@@ -114,5 +114,14 @@ pub fn migrations() -> Vec<Migration> {
                 CHECK (sala IN ('principal','b','c'));
         "#,
         },
+        Migration {
+            version: 6,
+            description: "eventos especiais da semana (assembleia, congresso, visita, celebracao)",
+            kind: MigrationKind::Up,
+            sql: r#"
+            ALTER TABLE semanas ADD COLUMN evento TEXT
+                CHECK (evento IS NULL OR evento IN ('assembleia','congresso','visita','celebracao'));
+        "#,
+        },
     ]
 }

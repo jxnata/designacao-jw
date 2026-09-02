@@ -2,6 +2,7 @@ import Database from "@tauri-apps/plugin-sql";
 import type {
   Config,
   Designacao,
+  EventoSemana,
   Parte,
   Pessoa,
   Sala,
@@ -203,6 +204,32 @@ export async function excluirSemana(id: number): Promise<void> {
   await db.execute(`DELETE FROM semanas WHERE id = $1`, [id]);
 }
 
+export async function atualizarEventoSemana(id: number, evento: EventoSemana | null): Promise<void> {
+  const db = await getDb();
+  await db.execute(`UPDATE semanas SET evento = $1, atualizado_em = datetime('now') WHERE id = $2`, [
+    evento,
+    id,
+  ]);
+}
+
+/** Devolve a semana ao estado "sem designações": apaga as designações
+ * gravadas (o que já a tira do histórico e do balanceador, já que ambos
+ * só consideram semanas com status='final') e limpa o evento marcado.
+ *
+ * Sem transação explícita de propósito: o `tauri-plugin-sql` não garante
+ * que chamadas sucessivas de `execute()` caiam na mesma conexão do pool,
+ * então um BEGIN/COMMIT manual aqui arrisca abrir a transação numa conexão
+ * e rodar as instruções seguintes noutra — foi isso que causava o erro
+ * "cannot rollback - no transaction is active". */
+export async function limparDesignacoesSemana(id: number): Promise<void> {
+  const db = await getDb();
+  await db.execute(`DELETE FROM designacoes WHERE semana_id = $1`, [id]);
+  await db.execute(
+    `UPDATE semanas SET status = 'importada', evento = NULL, atualizado_em = datetime('now') WHERE id = $1`,
+    [id],
+  );
+}
+
 // ---------- Designações ----------
 
 export async function listarDesignacoesPorSemana(semanaId: number): Promise<Designacao[]> {
@@ -363,11 +390,11 @@ export async function importarBackup(b: BackupCompleto): Promise<void> {
     }
     for (const s of b.semanas) {
       await db.execute(
-        `INSERT INTO semanas (id, ordinal, ano, semana_iso, doc_id, intervalo_texto, leitura_semanal, cantico_inicial, cantico_meio, cantico_final, status, atualizado_em)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        `INSERT INTO semanas (id, ordinal, ano, semana_iso, doc_id, intervalo_texto, leitura_semanal, cantico_inicial, cantico_meio, cantico_final, status, evento, atualizado_em)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
         [
           s.id, s.ordinal, s.ano, s.semana_iso, s.doc_id, s.intervalo_texto, s.leitura_semanal,
-          s.cantico_inicial, s.cantico_meio, s.cantico_final, s.status, s.atualizado_em,
+          s.cantico_inicial, s.cantico_meio, s.cantico_final, s.status, s.evento ?? null, s.atualizado_em,
         ],
       );
     }

@@ -10,6 +10,7 @@ import type {
   Config,
   DesignacaoHistorica,
   DesignacaoResultado,
+  EventoSemana,
   ItemPreview,
   Parte,
   ParteParaDesignar,
@@ -18,7 +19,7 @@ import type {
   Sala,
   Semana,
 } from "./types";
-import { ROTULO_TIPO } from "./types";
+import { EVENTOS_SEM_REUNIAO, ROTULO_TIPO, TITULO_DISCURSO_VISITA } from "./types";
 import { SECAO_POR_TIPO } from "./secoes";
 
 /** Salas adicionais, na ordem em que devem aparecer (depois do salão
@@ -149,6 +150,32 @@ export function unidadesDaSemana(
   return unidades;
 }
 
+/** Aplica o efeito de um evento sobre as unidades de uma semana:
+ * assembleia/congresso/celebração cancelam a reunião inteira (todas as
+ * unidades ficam bloqueadas e sem ninguém designado); visita substitui só
+ * o Estudo Bíblico de Congregação pelo discurso da visita, sem leitor. */
+export function aplicarEvento(unidades: ItemPreview[], evento: EventoSemana | null): ItemPreview[] {
+  if (!evento) return unidades.map((u) => ({ ...u, bloqueado: false }));
+
+  if (EVENTOS_SEM_REUNIAO.includes(evento)) {
+    return unidades.map((u) => ({ ...u, pessoa_id: null, ajudante_id: null, bloqueado: true }));
+  }
+
+  // evento === "visita"
+  return unidades.map((u) =>
+    u.tipo === "estudo_biblico"
+      ? {
+          ...u,
+          titulo: TITULO_DISCURSO_VISITA,
+          tem_ajudante: false,
+          pessoa_id: null,
+          ajudante_id: null,
+          bloqueado: true,
+        }
+      : { ...u, bloqueado: false },
+  );
+}
+
 /** Busca as partes de cada semana no banco e monta a lista de unidades de
  * todas elas, já na ordem cronológica (por `ordinal`). */
 export async function montarUnidades(semanas: Semana[]): Promise<ItemPreview[]> {
@@ -160,6 +187,24 @@ export async function montarUnidades(semanas: Semana[]): Promise<ItemPreview[]> 
     todas.push(...unidadesDaSemana(s, partes, config));
   }
   return todas;
+}
+
+/** Reagrupa `unidades` por semana e aplica `aplicarEvento` a cada grupo
+ * conforme o evento marcado naquela semana (`null` quando não há). */
+function aplicarEventosPorSemana(
+  unidades: ItemPreview[],
+  eventoPorSemanaId: Map<number, EventoSemana | null>,
+): ItemPreview[] {
+  const porSemana = new Map<number, ItemPreview[]>();
+  for (const u of unidades) {
+    if (!porSemana.has(u.semana_id)) porSemana.set(u.semana_id, []);
+    porSemana.get(u.semana_id)!.push(u);
+  }
+  const resultado: ItemPreview[] = [];
+  for (const [semanaId, itens] of porSemana) {
+    resultado.push(...aplicarEvento(itens, eventoPorSemanaId.get(semanaId) ?? null));
+  }
+  return resultado;
 }
 
 /** Carrega o preview editável de semanas já designadas (`status = 'final'`),
@@ -176,10 +221,12 @@ export async function carregarPreviewExistente(semanas: Semana[]): Promise<ItemP
       porChave.set(chave, { pessoa_id: d.pessoa_id, ajudante_id: d.ajudante_id });
     }
   }
-  return unidades.map((u) => {
+  const preenchido = unidades.map((u) => {
     const d = porChave.get(u.parte_id);
     return d ? { ...u, pessoa_id: d.pessoa_id, ajudante_id: d.ajudante_id } : u;
   });
+  const eventoPorSemanaId = new Map(semanas.map((s) => [s.id, s.evento]));
+  return aplicarEventosPorSemana(preenchido, eventoPorSemanaId);
 }
 
 /** Roda o balanceador em Rust sobre as unidades informadas e devolve o
@@ -193,6 +240,13 @@ export async function gerarPreview(
   const config = await getConfig();
   const semanaOrdinalPorId = new Map(semanas.map((s) => [s.id, s.ordinal]));
 
+  // Unidades atingidas por um evento (assembleia/congresso/visita/
+  // celebração) já saem zeradas e marcadas como bloqueadas aqui — nem
+  // entram no sorteio do balanceador, para não "gastar" ninguém em partes
+  // que não vão existir.
+  const eventoPorSemanaId = new Map(semanas.map((s) => [s.id, s.evento]));
+  const unidadesComEvento = aplicarEventosPorSemana(unidades, eventoPorSemanaId);
+
   const historico: DesignacaoHistorica[] = historicoBruto.map((h) => ({
     pessoa_id: h.pessoa_id,
     tipo: h.tipo as ItemPreview["tipo"],
@@ -202,8 +256,8 @@ export async function gerarPreview(
 
   // A oração inicial não passa pelo balanceador: é sempre feita por quem
   // preside a reunião naquela semana, então nem entra no sorteio.
-  const partesParaDesignar: ParteParaDesignar[] = unidades
-    .filter((u) => u.tipo !== "oracao_inicial")
+  const partesParaDesignar: ParteParaDesignar[] = unidadesComEvento
+    .filter((u) => u.tipo !== "oracao_inicial" && !u.bloqueado)
     .map((u) => ({
       parte_id: u.parte_id,
       semana_ordinal: semanaOrdinalPorId.get(u.semana_id) ?? 0,
@@ -225,7 +279,7 @@ export async function gerarPreview(
 
   const porId = new Map(resultado.map((r) => [r.parte_id, r]));
   const presidentePorSemana = new Map<number, number | null>();
-  for (const u of unidades) {
+  for (const u of unidadesComEvento) {
     // A oração inicial sempre acompanha o presidente do salão principal,
     // mesmo quando há salas adicionais com presidente próprio.
     if (u.tipo === "presidente" && u.sala === "principal") {
@@ -233,7 +287,8 @@ export async function gerarPreview(
     }
   }
 
-  return unidades.map((u) => {
+  return unidadesComEvento.map((u) => {
+    if (u.bloqueado) return u;
     if (u.tipo === "oracao_inicial") {
       return { ...u, pessoa_id: presidentePorSemana.get(u.semana_id) ?? null, ajudante_id: null };
     }

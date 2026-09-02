@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { confirm } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -8,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  Eraser,
   Eye,
   EyeOff,
   Loader2,
@@ -18,19 +20,29 @@ import {
   Trash2,
 } from "lucide-react";
 import {
+  atualizarEventoSemana,
   atualizarStatusSemana,
   excluirSemana,
   getConfig,
   importarSemanas,
+  limparDesignacoesSemana,
   listarPessoas,
   listarSemanas,
   salvarDesignacoes,
 } from "../lib/db";
-import { carregarPreviewExistente, gerarPreview, montarUnidades, parsearChave } from "../lib/designacao";
+import {
+  aplicarEvento,
+  carregarPreviewExistente,
+  gerarPreview,
+  montarUnidades,
+  parsearChave,
+} from "../lib/designacao";
 import { elegivel, elegivelAjudante } from "../lib/regras";
 import { CORES_SECAO, SECAO_POR_TIPO } from "../lib/secoes";
-import { ROTULO_SALA, ROTULO_TIPO } from "../lib/types";
-import type { Config, ItemPreview, Pessoa, Sala, Semana } from "../lib/types";
+import { ROTULO_EVENTO, ROTULO_SALA, ROTULO_TIPO, TITULO_DISCURSO_VISITA } from "../lib/types";
+import type { Config, EventoSemana, ItemPreview, Pessoa, Sala, Semana } from "../lib/types";
+
+const EVENTOS_ORDENADOS: EventoSemana[] = ["assembleia", "congresso", "visita", "celebracao"];
 
 export default function Designacao() {
   const [semanas, setSemanas] = useState<Semana[]>([]);
@@ -42,8 +54,12 @@ export default function Designacao() {
   const [gerandoPreview, setGerandoPreview] = useState(false);
   const [preview, setPreview] = useState<ItemPreview[] | null>(null);
   const [modoPreview, setModoPreview] = useState<"gerar" | "editar">("gerar");
+  const [eventos, setEventos] = useState<Map<number, EventoSemana | null>>(new Map());
   const [mostrarTodos, setMostrarTodos] = useState<Set<string>>(new Set());
   const [erro, setErro] = useState<string | null>(null);
+  const [mensagem, setMensagem] = useState<string | null>(null);
+  const [limpando, setLimpando] = useState<number | null>(null);
+  const [salvandoPreview, setSalvandoPreview] = useState(false);
   const [pagina, setPagina] = useState(1);
   const navigate = useNavigate();
 
@@ -74,13 +90,11 @@ export default function Designacao() {
   }, [pagina, totalPaginas]);
 
   async function buscarSemanas() {
-    if (
-      !confirm(
-        `Isso vai buscar ${quantidade === 1 ? "a próxima semana" : `as próximas ${quantidade} semanas`} diretamente do jw.org. Pode levar alguns instantes. Continuar?`,
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm(
+      `Isso vai buscar ${quantidade === 1 ? "a próxima semana" : `as próximas ${quantidade} semanas`} diretamente do jw.org. Pode levar alguns instantes. Continuar?`,
+      { title: "Carregar semanas", kind: "info" },
+    );
+    if (!ok) return;
     const ultima = [...semanas].sort((a, b) => b.ordinal - a.ordinal)[0];
     setErro(null);
     setAdicionando(true);
@@ -132,6 +146,7 @@ export default function Designacao() {
       const unidades = await montarUnidades(semanasEscolhidas);
       const preenchido = await gerarPreview(semanasEscolhidas, unidades);
       setModoPreview("gerar");
+      setEventos(new Map(semanasEscolhidas.map((s) => [s.id, s.evento])));
       setPreview(preenchido);
     } catch (e) {
       setErro(String(e));
@@ -148,6 +163,7 @@ export default function Designacao() {
     try {
       const preenchido = await carregarPreviewExistente(semanasEscolhidas);
       setModoPreview("editar");
+      setEventos(new Map(semanasEscolhidas.map((s) => [s.id, s.evento])));
       setPreview(preenchido);
     } catch (e) {
       setErro(String(e));
@@ -174,32 +190,95 @@ export default function Designacao() {
     );
   }
 
+  /** Marca (ou desmarca, se já estava marcado) o evento de uma semana no
+   * preview e reaplica o efeito sobre as unidades daquela semana — zera e
+   * bloqueia os campos afetados. */
+  function definirEvento(semanaId: number, evento: EventoSemana) {
+    setEventos((mapa) => {
+      const novo = new Map(mapa);
+      novo.set(semanaId, mapa.get(semanaId) === evento ? null : evento);
+      return novo;
+    });
+    setPreview((p) => {
+      if (!p) return p;
+      const eventoNovo = eventos.get(semanaId) === evento ? null : evento;
+      const daSemana = p.filter((i) => i.semana_id === semanaId);
+      const ajustadas = aplicarEvento(daSemana, eventoNovo);
+      const porChave = new Map(ajustadas.map((i) => [i.parte_id, i]));
+      return p.map((i) => porChave.get(i.parte_id) ?? i);
+    });
+  }
+
   async function confirmarEGerar() {
     if (!preview) return;
-    const semanaIds = [...new Set(preview.map((i) => i.semana_id))];
-    const designacoes = preview.map((i) => {
-      const { parte_id } = parsearChave(i.parte_id);
-      return {
-        semana_id: i.semana_id,
-        parte_id,
-        tipo: i.tipo,
-        pessoa_id: i.pessoa_id,
-        ajudante_id: i.ajudante_id,
-        sala: i.sala,
-      };
-    });
-    await salvarDesignacoes(semanaIds, designacoes);
-    for (const id of semanaIds) await atualizarStatusSemana(id, "final");
-    setPreview(null);
-    setSelecionadas(new Set());
-    await recarregar();
-    navigate(`/impressao?semanas=${semanaIds.join(",")}`);
+    setErro(null);
+    setSalvandoPreview(true);
+    try {
+      const semanaIds = [...new Set(preview.map((i) => i.semana_id))];
+      const designacoes = preview.map((i) => {
+        const { parte_id } = parsearChave(i.parte_id);
+        return {
+          semana_id: i.semana_id,
+          parte_id,
+          tipo: i.tipo,
+          pessoa_id: i.pessoa_id,
+          ajudante_id: i.ajudante_id,
+          sala: i.sala,
+        };
+      });
+      await salvarDesignacoes(semanaIds, designacoes);
+      for (const id of semanaIds) {
+        await atualizarEventoSemana(id, eventos.get(id) ?? null);
+        await atualizarStatusSemana(id, "final");
+      }
+      setPreview(null);
+      setEventos(new Map());
+      setSelecionadas(new Set());
+      await recarregar();
+      navigate(`/impressao?semanas=${semanaIds.join(",")}`);
+    } catch (e) {
+      setErro(String(e));
+    } finally {
+      setSalvandoPreview(false);
+    }
   }
 
   async function excluir(id: number) {
-    if (!confirm("Excluir esta semana importada?")) return;
+    const semana = semanas.find((s) => s.id === id);
+    const ok = await confirm(`Excluir "${semana?.intervalo_texto ?? "esta semana"}"?`, {
+      title: "Excluir semana",
+      kind: "warning",
+    });
+    if (!ok) return;
     await excluirSemana(id);
     await recarregar();
+  }
+
+  async function limpar(id: number) {
+    const semana = semanas.find((s) => s.id === id);
+    const ok = await confirm(
+      `Limpar as designações de "${semana?.intervalo_texto ?? "esta semana"}"? Ela volta a ficar sem designações e sai do histórico.`,
+      { title: "Limpar designações", kind: "warning" },
+    );
+    if (!ok) return;
+    setErro(null);
+    setMensagem(null);
+    setLimpando(id);
+    try {
+      await limparDesignacoesSemana(id);
+      setSelecionadas((s) => {
+        if (!s.has(id)) return s;
+        const novo = new Set(s);
+        novo.delete(id);
+        return novo;
+      });
+      await recarregar();
+      setMensagem(`Designações de "${semana?.intervalo_texto ?? "semana"}" removidas.`);
+    } catch (e) {
+      setErro(String(e));
+    } finally {
+      setLimpando(null);
+    }
   }
 
   const pessoasPorId = useMemo(() => new Map(pessoas.map((p) => [p.id, p])), [pessoas]);
@@ -242,10 +321,16 @@ export default function Designacao() {
               Voltar
             </button>
             <button
-              className="inline-flex items-center gap-1.5 rounded bg-teal-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-800"
+              className="inline-flex items-center gap-1.5 rounded bg-teal-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-800 disabled:opacity-50"
               onClick={confirmarEGerar}
+              disabled={salvandoPreview}
             >
-              {modoPreview === "editar" ? (
+              {salvandoPreview ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Salvando…
+                </>
+              ) : modoPreview === "editar" ? (
                 <>
                   <Save className="size-4" />
                   Salvar alterações
@@ -260,6 +345,8 @@ export default function Designacao() {
           </div>
         </div>
 
+        {erro && <p className="mb-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</p>}
+
         <div className="space-y-6">
           {[...porSemana.entries()].map(([semanaId, itens]) => {
             const semana = semanas.find((s) => s.id === semanaId);
@@ -271,9 +358,27 @@ export default function Designacao() {
             const ordemSalas: Sala[] = ["principal", "b", "c"];
             return (
               <div key={semanaId} className="rounded border border-slate-200 bg-white p-4">
-                <h2 className="mb-3 text-sm font-semibold text-slate-700">
-                  {semana?.intervalo_texto} — {semana?.leitura_semanal}
-                </h2>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="text-sm font-semibold text-slate-700">
+                    {semana?.intervalo_texto} — {semana?.leitura_semanal}
+                  </h2>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {EVENTOS_ORDENADOS.map((ev) => (
+                      <label
+                        key={ev}
+                        className="flex items-center gap-1.5 text-xs font-medium text-slate-600"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={eventos.get(semanaId) === ev}
+                          onChange={() => definirEvento(semanaId, ev)}
+                          className="accent-orange-600"
+                        />
+                        {ROTULO_EVENTO[ev]}
+                      </label>
+                    ))}
+                  </div>
+                </div>
                 <div className="space-y-4">
                   {ordemSalas
                     .filter((sala) => porSala.has(sala))
@@ -303,6 +408,7 @@ export default function Designacao() {
                               onChange={(campo, valor) => atualizarItem(item.parte_id, campo, valor)}
                               onInverterAjudante={() => inverterAjudante(item.parte_id)}
                               config={config}
+                              bloqueado={!!item.bloqueado}
                             />
                           ))}
                         </div>
@@ -358,6 +464,9 @@ export default function Designacao() {
         </div>
       </div>
 
+      {mensagem && (
+        <p className="mb-3 rounded bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{mensagem}</p>
+      )}
       {erro && <p className="mb-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</p>}
 
       <div className="overflow-hidden rounded border border-slate-200 bg-white">
@@ -386,17 +495,38 @@ export default function Designacao() {
                 <td className="px-3 py-2 font-medium">{s.intervalo_texto}</td>
                 <td className="px-3 py-2 text-slate-600">{s.leitura_semanal}</td>
                 <td className="px-3 py-2">
-                  <StatusBadge status={s.status} />
+                  <div className="flex items-center gap-1.5">
+                    <StatusBadge status={s.status} />
+                    {s.evento && (
+                      <span className="rounded bg-orange-50 px-2 py-0.5 text-xs text-orange-700">
+                        {ROTULO_EVENTO[s.evento]}
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-3 py-2 text-right">
                   {temDesignacao(s) ? (
-                    <button
-                      className="rounded p-1 text-teal-700 hover:bg-teal-50"
-                      onClick={() => editarSemanas([s.id])}
-                      title="Editar designações"
-                    >
-                      <Pencil className="size-4" />
-                    </button>
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        className="rounded p-1 text-teal-700 hover:bg-teal-50"
+                        onClick={() => editarSemanas([s.id])}
+                        title="Editar designações"
+                      >
+                        <Pencil className="size-4" />
+                      </button>
+                      <button
+                        className="rounded p-1 text-orange-600 hover:bg-orange-50 disabled:opacity-50"
+                        onClick={() => limpar(s.id)}
+                        disabled={limpando === s.id}
+                        title="Limpar designações da semana"
+                      >
+                        {limpando === s.id ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Eraser className="size-4" />
+                        )}
+                      </button>
+                    </div>
                   ) : (
                     <button
                       className="rounded p-1 text-red-600 hover:bg-red-50"
@@ -507,6 +637,7 @@ function LinhaPreview({
   onChange,
   onInverterAjudante,
   config,
+  bloqueado,
 }: {
   item: ItemPreview;
   pessoas: Pessoa[];
@@ -517,6 +648,7 @@ function LinhaPreview({
   onChange: (campo: "pessoa_id" | "ajudante_id", valor: number | null) => void;
   onInverterAjudante: () => void;
   config: Config | null;
+  bloqueado: boolean;
 }) {
   const ehLeitorEstudo = item.tipo === "estudo_biblico";
   const opcoes = (
@@ -537,6 +669,8 @@ function LinhaPreview({
 
   const secao = SECAO_POR_TIPO[item.tipo];
   const cores = secao ? CORES_SECAO[secao] : null;
+  const ehDiscursoVisita = item.titulo === TITULO_DISCURSO_VISITA;
+  const subtitulo = ehDiscursoVisita ? "Superintendente Viajante" : ROTULO_TIPO[item.tipo];
 
   return (
     <div
@@ -545,25 +679,34 @@ function LinhaPreview({
     >
       <div className="w-56 shrink-0 text-xs text-slate-600">
         <div className="font-medium text-slate-800">{item.titulo}</div>
-        <div>{ROTULO_TIPO[item.tipo]}</div>
+        <div>{subtitulo}</div>
       </div>
 
-      <select
-        className={`min-w-[180px] flex-1 rounded border px-2 py-1 text-sm ${
-          item.pessoa_id ? "border-slate-300" : "border-amber-400 bg-amber-50"
-        }`}
-        value={item.pessoa_id ?? ""}
-        onChange={(e) => onChange("pessoa_id", e.target.value ? Number(e.target.value) : null)}
-      >
-        <option value="">— sem designação —</option>
-        {opcoes.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.nome} ({contagemPorPessoa.get(p.id) ?? 0})
-          </option>
-        ))}
-      </select>
+      {bloqueado ? (
+        <div
+          className="min-w-[180px] flex-1 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-sm text-slate-400"
+          title="Sem designação — evento marcado nesta semana"
+        >
+          — sem designação —
+        </div>
+      ) : (
+        <select
+          className={`min-w-[180px] flex-1 rounded border px-2 py-1 text-sm ${
+            item.pessoa_id ? "border-slate-300" : "border-amber-400 bg-amber-50"
+          }`}
+          value={item.pessoa_id ?? ""}
+          onChange={(e) => onChange("pessoa_id", e.target.value ? Number(e.target.value) : null)}
+        >
+          <option value="">— sem designação —</option>
+          {opcoes.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.nome} ({contagemPorPessoa.get(p.id) ?? 0})
+            </option>
+          ))}
+        </select>
+      )}
 
-      {item.tem_ajudante && !ehLeitorEstudo && (
+      {item.tem_ajudante && !ehLeitorEstudo && !bloqueado && (
         <button
           type="button"
           className="shrink-0 rounded border border-slate-300 p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
@@ -575,7 +718,7 @@ function LinhaPreview({
         </button>
       )}
 
-      {item.tem_ajudante && (
+      {item.tem_ajudante && !bloqueado && (
         <select
           className="min-w-[180px] flex-1 rounded border border-slate-300 px-2 py-1 text-sm"
           value={item.ajudante_id ?? ""}
@@ -590,24 +733,26 @@ function LinhaPreview({
         </select>
       )}
 
-      <button
-        type="button"
-        className="inline-flex shrink-0 items-center gap-1 text-xs text-slate-400 hover:text-slate-700"
-        onClick={onToggleMostrarTodos}
-        title="Mostrar todas as pessoas, mesmo as não elegíveis"
-      >
-        {mostrarTodos ? (
-          <>
-            <EyeOff className="size-3.5" />
-            só elegíveis
-          </>
-        ) : (
-          <>
-            <Eye className="size-3.5" />
-            mostrar todos
-          </>
-        )}
-      </button>
+      {!bloqueado && (
+        <button
+          type="button"
+          className="inline-flex shrink-0 items-center gap-1 text-xs text-slate-400 hover:text-slate-700"
+          onClick={onToggleMostrarTodos}
+          title="Mostrar todas as pessoas, mesmo as não elegíveis"
+        >
+          {mostrarTodos ? (
+            <>
+              <EyeOff className="size-3.5" />
+              só elegíveis
+            </>
+          ) : (
+            <>
+              <Eye className="size-3.5" />
+              mostrar todos
+            </>
+          )}
+        </button>
+      )}
     </div>
   );
 }

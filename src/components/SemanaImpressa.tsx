@@ -1,6 +1,6 @@
 import { calcularHorarios } from "../lib/horarios";
 import { CORES_SECAO, SECAO_POR_TIPO } from "../lib/secoes";
-import { ROTULO_SALA } from "../lib/types";
+import { EVENTOS_SEM_REUNIAO, ROTULO_EVENTO, ROTULO_SALA, TITULO_DISCURSO_VISITA } from "../lib/types";
 import type { Config, Designacao, Parte, Pessoa, Sala, Semana, TipoParte } from "../lib/types";
 
 const TITULOS_SECAO: Record<"tesouros" | "ministerio" | "vida_crista", string> = {
@@ -52,11 +52,20 @@ export default function SemanaImpressa({ semana, partes, designacoes, pessoasPor
     ...(config.sala_b && config.sala_c ? (["c"] as const) : []),
   ];
 
-  function nome(d?: Designacao): string {
+  /** Abrevia sobrenomes ("Jonatã Oliveira" -> "Jonatã O.") para caber sem
+   * quebra de linha nas linhas com designação por sala (principal + B/C). */
+  function abreviar(nomeCompleto: string): string {
+    const [primeiro, ...resto] = nomeCompleto.split(" ").filter(Boolean);
+    if (!primeiro || resto.length === 0) return nomeCompleto;
+    return `${primeiro} ${resto.map((p) => `${p[0]}.`).join(" ")}`;
+  }
+
+  function nome(d?: Designacao, opts?: { abreviar?: boolean }): string {
     if (!d?.pessoa_id) return "";
-    const principal = pessoasPorId.get(d.pessoa_id)?.nome ?? "";
+    const formatar = opts?.abreviar ? abreviar : (n: string) => n;
+    const principal = formatar(pessoasPorId.get(d.pessoa_id)?.nome ?? "");
     if (d.ajudante_id && d.tipo !== "estudo_biblico") {
-      const aj = pessoasPorId.get(d.ajudante_id)?.nome ?? "";
+      const aj = formatar(pessoasPorId.get(d.ajudante_id)?.nome ?? "");
       return aj ? `${principal} & ${aj}` : principal;
     }
     return principal;
@@ -73,12 +82,18 @@ export default function SemanaImpressa({ semana, partes, designacoes, pessoasPor
   const ministerioPartes = partes.filter((p) => p.secao === "ministerio");
   const vidaCristaPartes = partes.filter((p) => p.secao === "vida_crista");
 
+  const ehVisita = semana.evento === "visita";
+
   function Linha({ parte }: { parte: Parte }) {
     const d = porTipo.get(`principal:parte:${parte.id}`);
-    const rotulo = rotuloPapel(parte.tipo);
+    const ehDiscursoVisita = ehVisita && parte.tipo === "estudo_biblico";
+    const titulo = ehDiscursoVisita ? TITULO_DISCURSO_VISITA : parte.titulo;
+    const rotulo = ehDiscursoVisita ? null : rotuloPapel(parte.tipo);
     const emLinha = rotuloEmLinha(parte.tipo);
     const leitor =
-      parte.tipo === "estudo_biblico" && d?.ajudante_id ? pessoasPorId.get(d.ajudante_id)?.nome : null;
+      !ehDiscursoVisita && parte.tipo === "estudo_biblico" && d?.ajudante_id
+        ? pessoasPorId.get(d.ajudante_id)?.nome
+        : null;
 
     // Leitura da Bíblia e as partes de ministério ganham uma designação por
     // sala ativa — as demais continuam com um único nome, como sempre.
@@ -91,17 +106,17 @@ export default function SemanaImpressa({ semana, partes, designacoes, pessoasPor
       : [];
 
     return (
-      <div className="linha-impressa grid grid-cols-[46px_1fr_200px] items-start gap-2 py-[3px] text-[10.5px] leading-tight">
+      <div className="linha-impressa grid grid-cols-[46px_1fr_230px] items-start gap-2 py-[3px] text-[10.5px] leading-tight">
         <div className="pt-0.5 text-slate-500">{horarios[`parte_${parte.id}`]}</div>
         <div>
-          {parte.numero}. {parte.titulo} ({parte.duracao_min} min.)
+          {parte.numero}. {titulo} ({parte.duracao_min} min.)
         </div>
         {porSala.length > 1 ? (
           <div className="space-y-0.5">
             {porSala.map(({ sala, d: dSala }) => (
-              <div key={sala}>
+              <div key={sala} className="whitespace-nowrap">
                 <span className="text-[9px] text-slate-500">{ROTULO_SALA[sala]}: </span>
-                <span className="font-medium">{nome(dSala)}</span>
+                <span className="font-medium">{nome(dSala, { abreviar: true })}</span>
               </div>
             ))}
           </div>
@@ -137,6 +152,22 @@ export default function SemanaImpressa({ semana, partes, designacoes, pessoasPor
     );
   }
 
+  if (semana.evento && EVENTOS_SEM_REUNIAO.includes(semana.evento)) {
+    return (
+      <div className="semana-impressa mb-6 rounded border border-slate-200 p-3">
+        <div className="mb-1 border-b border-slate-300 pb-1 text-sm font-semibold">
+          {semana.intervalo_texto} | {semana.leitura_semanal}
+        </div>
+        <div
+          className="linha-impressa my-1 px-2 py-2 text-center text-[11px] font-semibold text-white"
+          style={{ background: CORES_SECAO.vida_crista.borda }}
+        >
+          Não haverá reunião — {ROTULO_EVENTO[semana.evento]}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="semana-impressa mb-6 rounded border border-slate-200 p-3">
       <div className="mb-1 flex items-baseline justify-between border-b border-slate-300 pb-1">
@@ -155,7 +186,7 @@ export default function SemanaImpressa({ semana, partes, designacoes, pessoasPor
         </div>
       </div>
 
-      <div className="linha-impressa grid grid-cols-[46px_1fr_200px] items-start gap-2 py-[3px] text-[10.5px]">
+      <div className="linha-impressa grid grid-cols-[46px_1fr_230px] items-start gap-2 py-[3px] text-[10.5px]">
         <div className="text-slate-500">{horarios["cantico_inicial"]}</div>
         <div>Cântico {semana.cantico_inicial}</div>
         <div>
@@ -163,7 +194,7 @@ export default function SemanaImpressa({ semana, partes, designacoes, pessoasPor
           <span className="font-medium">{nome(oracaoInicial)}</span>
         </div>
       </div>
-      <div className="linha-impressa grid grid-cols-[46px_1fr_200px] items-start gap-2 py-[3px] text-[10.5px]">
+      <div className="linha-impressa grid grid-cols-[46px_1fr_230px] items-start gap-2 py-[3px] text-[10.5px]">
         <div className="text-slate-500">{horarios["comentarios_iniciais"]}</div>
         <div>Comentários iniciais (1 min)</div>
         <div className="text-[9px] text-slate-500">Salão principal</div>
@@ -179,7 +210,7 @@ export default function SemanaImpressa({ semana, partes, designacoes, pessoasPor
         <Linha key={p.id} parte={p} />
       ))}
 
-      <div className="linha-impressa grid grid-cols-[46px_1fr_200px] items-start gap-2 py-[3px] text-[10.5px]">
+      <div className="linha-impressa grid grid-cols-[46px_1fr_230px] items-start gap-2 py-[3px] text-[10.5px]">
         <div className="text-slate-500">{horarios["cantico_meio"]}</div>
         <div>Cântico {semana.cantico_meio}</div>
         <div />
@@ -190,12 +221,12 @@ export default function SemanaImpressa({ semana, partes, designacoes, pessoasPor
         <Linha key={p.id} parte={p} />
       ))}
 
-      <div className="linha-impressa grid grid-cols-[46px_1fr_200px] items-start gap-2 border-t border-slate-200 py-[3px] pt-1 text-[10.5px]">
+      <div className="linha-impressa grid grid-cols-[46px_1fr_230px] items-start gap-2 border-t border-slate-200 py-[3px] pt-1 text-[10.5px]">
         <div className="text-slate-500">{horarios["comentarios_finais"]}</div>
         <div>Comentários finais (3 min)</div>
         <div />
       </div>
-      <div className="linha-impressa grid grid-cols-[46px_1fr_200px] items-start gap-2 py-[3px] text-[10.5px]">
+      <div className="linha-impressa grid grid-cols-[46px_1fr_230px] items-start gap-2 py-[3px] text-[10.5px]">
         <div className="text-slate-500">{horarios["cantico_final"]}</div>
         <div>Cântico {semana.cantico_final}</div>
         <div>

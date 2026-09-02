@@ -100,6 +100,22 @@ export interface SemanaWeb {
 
 export type StatusSemana = "importada" | "preview" | "final";
 
+export type EventoSemana = "assembleia" | "congresso" | "visita" | "celebracao";
+
+export const ROTULO_EVENTO: Record<EventoSemana, string> = {
+  assembleia: "Assembleia",
+  congresso: "Congresso",
+  visita: "Visita",
+  celebracao: "Celebração",
+};
+
+/** Eventos que cancelam a reunião inteira — ninguém é designado para
+ * nenhuma parte. "Visita" não entra aqui: a reunião acontece normalmente,
+ * só o Estudo Bíblico de Congregação é substituído. */
+export const EVENTOS_SEM_REUNIAO: EventoSemana[] = ["assembleia", "congresso", "celebracao"];
+
+export const TITULO_DISCURSO_VISITA = "Discurso da Visita";
+
 export interface Semana {
   id: number;
   ordinal: number;
@@ -112,6 +128,7 @@ export interface Semana {
   cantico_meio: number | null;
   cantico_final: number | null;
   status: StatusSemana;
+  evento: EventoSemana | null;
   atualizado_em: string;
 }
 
@@ -184,4 +201,7 @@ export interface ItemPreview {
   pessoa_id: number | null;
   ajudante_id: number | null;
   sala: Sala;
+  /** true quando o evento marcado na semana (assembleia/congresso/visita/
+   * celebração) impede designar essa unidade — a UI desabilita os campos. */
+  bloqueado?: boolean;
 }
