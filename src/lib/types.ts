@@ -38,6 +38,14 @@ export const ROTULO_TIPO: Record<TipoParte, string> = {
 
 export type Secao = "tesouros" | "ministerio" | "vida_crista";
 
+export type Sala = "principal" | "b" | "c";
+
+export const ROTULO_SALA: Record<Sala, string> = {
+  principal: "Salão principal",
+  b: "Sala B",
+  c: "Sala C",
+};
+
 export interface Pessoa {
   id: number;
   nome: string;
@@ -62,6 +70,8 @@ export interface Config {
   usar_anciaos_leitura: boolean;
   congregacao_sinais: boolean;
   usar_anciaos_leitura_ebc: boolean;
+  sala_b: boolean;
+  sala_c: boolean;
 }
 
 export interface ParteWeb {
@@ -125,6 +135,7 @@ export interface Designacao {
   tipo: TipoParte;
   pessoa_id: number | null;
   ajudante_id: number | null;
+  sala: Sala;
 }
 
 // --- payloads do comando Rust `gerar_atribuicoes` ---
@@ -172,4 +183,5 @@ export interface ItemPreview {
   tem_ajudante: boolean;
   pessoa_id: number | null;
   ajudante_id: number | null;
+  sala: Sala;
 }

@@ -4,6 +4,7 @@ import type {
   Designacao,
   Parte,
   Pessoa,
+  Sala,
   Semana,
   SemanaWeb,
   StatusSemana,
@@ -92,6 +93,8 @@ function toConfig(r: Record<string, unknown>): Config {
     usar_anciaos_leitura: bool(r.usar_anciaos_leitura),
     congregacao_sinais: bool(r.congregacao_sinais),
     usar_anciaos_leitura_ebc: bool(r.usar_anciaos_leitura_ebc),
+    sala_b: bool(r.sala_b),
+    sala_c: bool(r.sala_c),
   };
 }
 
@@ -104,7 +107,7 @@ export async function getConfig(): Promise<Config> {
 export async function salvarConfig(c: Config): Promise<void> {
   const db = await getDb();
   await db.execute(
-    `UPDATE config SET congregacao=$1, dia_semana=$2, horario=$3, transicao_min=$4, usar_servos_presidencia=$5, usar_servos_estudo_biblico=$6, usar_anciaos_leitura=$7, congregacao_sinais=$8, usar_anciaos_leitura_ebc=$9 WHERE id=1`,
+    `UPDATE config SET congregacao=$1, dia_semana=$2, horario=$3, transicao_min=$4, usar_servos_presidencia=$5, usar_servos_estudo_biblico=$6, usar_anciaos_leitura=$7, congregacao_sinais=$8, usar_anciaos_leitura_ebc=$9, sala_b=$10, sala_c=$11 WHERE id=1`,
     [
       c.congregacao,
       c.dia_semana,
@@ -115,6 +118,8 @@ export async function salvarConfig(c: Config): Promise<void> {
       int(c.usar_anciaos_leitura),
       int(c.congregacao_sinais),
       int(c.usar_anciaos_leitura_ebc),
+      int(c.sala_b),
+      int(c.sala_c),
     ],
   );
 }
@@ -211,6 +216,7 @@ export interface DesignacaoParaGravar {
   tipo: TipoParteMinimo;
   pessoa_id: number | null;
   ajudante_id: number | null;
+  sala: Sala;
 }
 type TipoParteMinimo = string;
 
@@ -226,8 +232,8 @@ export async function salvarDesignacoes(
   }
   for (const d of designacoes) {
     await db.execute(
-      `INSERT INTO designacoes (semana_id, parte_id, tipo, pessoa_id, ajudante_id) VALUES ($1,$2,$3,$4,$5)`,
-      [d.semana_id, d.parte_id, d.tipo, d.pessoa_id, d.ajudante_id],
+      `INSERT INTO designacoes (semana_id, parte_id, tipo, pessoa_id, ajudante_id, sala) VALUES ($1,$2,$3,$4,$5,$6)`,
+      [d.semana_id, d.parte_id, d.tipo, d.pessoa_id, d.ajudante_id, d.sala],
     );
   }
 }
@@ -333,7 +339,7 @@ export async function importarBackup(b: BackupCompleto): Promise<void> {
     await db.execute(`DELETE FROM pessoas`);
 
     await db.execute(
-      `UPDATE config SET congregacao=$1, dia_semana=$2, horario=$3, transicao_min=$4, usar_servos_presidencia=$5, usar_servos_estudo_biblico=$6, usar_anciaos_leitura=$7, congregacao_sinais=$8, usar_anciaos_leitura_ebc=$9 WHERE id=1`,
+      `UPDATE config SET congregacao=$1, dia_semana=$2, horario=$3, transicao_min=$4, usar_servos_presidencia=$5, usar_servos_estudo_biblico=$6, usar_anciaos_leitura=$7, congregacao_sinais=$8, usar_anciaos_leitura_ebc=$9, sala_b=$10, sala_c=$11 WHERE id=1`,
       [
         b.config.congregacao,
         b.config.dia_semana,
@@ -344,6 +350,8 @@ export async function importarBackup(b: BackupCompleto): Promise<void> {
         int(b.config.usar_anciaos_leitura ?? false),
         int(b.config.congregacao_sinais ?? false),
         int(b.config.usar_anciaos_leitura_ebc ?? false),
+        int(b.config.sala_b ?? false),
+        int(b.config.sala_c ?? false),
       ],
     );
 
@@ -372,8 +380,8 @@ export async function importarBackup(b: BackupCompleto): Promise<void> {
     }
     for (const d of b.designacoes) {
       await db.execute(
-        `INSERT INTO designacoes (id, semana_id, parte_id, tipo, pessoa_id, ajudante_id) VALUES ($1,$2,$3,$4,$5,$6)`,
-        [d.id, d.semana_id, d.parte_id, d.tipo, d.pessoa_id, d.ajudante_id],
+        `INSERT INTO designacoes (id, semana_id, parte_id, tipo, pessoa_id, ajudante_id, sala) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [d.id, d.semana_id, d.parte_id, d.tipo, d.pessoa_id, d.ajudante_id, d.sala ?? "principal"],
       );
     }
     await db.execute("COMMIT");

@@ -1,6 +1,7 @@
 import { calcularHorarios } from "../lib/horarios";
-import { CORES_SECAO } from "../lib/secoes";
-import type { Config, Designacao, Parte, Pessoa, Semana, TipoParte } from "../lib/types";
+import { CORES_SECAO, SECAO_POR_TIPO } from "../lib/secoes";
+import { ROTULO_SALA } from "../lib/types";
+import type { Config, Designacao, Parte, Pessoa, Sala, Semana, TipoParte } from "../lib/types";
 
 const TITULOS_SECAO: Record<"tesouros" | "ministerio" | "vida_crista", string> = {
   tesouros: "TESOUROS DA PALAVRA DE DEUS",
@@ -36,12 +37,20 @@ interface Props {
 }
 
 export default function SemanaImpressa({ semana, partes, designacoes, pessoasPorId, config }: Props) {
+  // Chave inclui a sala — necessário porque leitura/ministério podem ter uma
+  // designação por sala (salão principal + Sala B/C) na mesma semana.
   const porTipo = new Map<string, Designacao>();
   for (const d of designacoes) {
-    const chave = d.parte_id ? `parte:${d.parte_id}` : `tipo:${d.tipo}`;
-    porTipo.set(chave, d);
+    const sufixo = d.parte_id ? `parte:${d.parte_id}` : `tipo:${d.tipo}`;
+    porTipo.set(`${d.sala}:${sufixo}`, d);
   }
   const horarios = calcularHorarios(config, partes);
+
+  const salasAtivas: Sala[] = [
+    "principal",
+    ...(config.sala_b ? (["b"] as const) : []),
+    ...(config.sala_b && config.sala_c ? (["c"] as const) : []),
+  ];
 
   function nome(d?: Designacao): string {
     if (!d?.pessoa_id) return "";
@@ -53,7 +62,10 @@ export default function SemanaImpressa({ semana, partes, designacoes, pessoasPor
     return principal;
   }
 
-  const presidente = designacoes.find((d) => d.tipo === "presidente");
+  const presidente = designacoes.find((d) => d.tipo === "presidente" && d.sala === "principal");
+  const presidentesSalas = salasAtivas
+    .slice(1)
+    .map((sala) => ({ sala, d: designacoes.find((d) => d.tipo === "presidente" && d.sala === sala) }));
   const oracaoInicial = designacoes.find((d) => d.tipo === "oracao_inicial");
   const oracaoFinal = designacoes.find((d) => d.tipo === "oracao_final");
 
@@ -62,18 +74,38 @@ export default function SemanaImpressa({ semana, partes, designacoes, pessoasPor
   const vidaCristaPartes = partes.filter((p) => p.secao === "vida_crista");
 
   function Linha({ parte }: { parte: Parte }) {
-    const d = porTipo.get(`parte:${parte.id}`);
+    const d = porTipo.get(`principal:parte:${parte.id}`);
     const rotulo = rotuloPapel(parte.tipo);
     const emLinha = rotuloEmLinha(parte.tipo);
     const leitor =
       parte.tipo === "estudo_biblico" && d?.ajudante_id ? pessoasPorId.get(d.ajudante_id)?.nome : null;
+
+    // Leitura da Bíblia e as partes de ministério ganham uma designação por
+    // sala ativa — as demais continuam com um único nome, como sempre.
+    const replicavel = SECAO_POR_TIPO[parte.tipo] === "ministerio";
+    const porSala = replicavel
+      ? salasAtivas.map((sala) => ({
+          sala,
+          d: sala === "principal" ? d : porTipo.get(`${sala}:parte:${parte.id}`),
+        }))
+      : [];
+
     return (
       <div className="linha-impressa grid grid-cols-[46px_1fr_200px] items-start gap-2 py-[3px] text-[10.5px] leading-tight">
         <div className="pt-0.5 text-slate-500">{horarios[`parte_${parte.id}`]}</div>
         <div>
           {parte.numero}. {parte.titulo} ({parte.duracao_min} min.)
         </div>
-        {emLinha ? (
+        {porSala.length > 1 ? (
+          <div className="space-y-0.5">
+            {porSala.map(({ sala, d: dSala }) => (
+              <div key={sala}>
+                <span className="text-[9px] text-slate-500">{ROTULO_SALA[sala]}: </span>
+                <span className="font-medium">{nome(dSala)}</span>
+              </div>
+            ))}
+          </div>
+        ) : emLinha ? (
           <div>
             {rotulo && <span className="text-[9px] text-slate-500">{rotulo} </span>}
             <span className="font-medium">{nome(d)}</span>
@@ -114,6 +146,12 @@ export default function SemanaImpressa({ semana, partes, designacoes, pessoasPor
         <div className="text-right text-[10px]">
           <div className="text-slate-500">Presidente:</div>
           <div className="font-medium">{nome(presidente)}</div>
+          {presidentesSalas.map(({ sala, d }) => (
+            <div key={sala}>
+              <div className="mt-0.5 text-slate-500">{ROTULO_SALA[sala]}:</div>
+              <div className="font-medium">{nome(d)}</div>
+            </div>
+          ))}
         </div>
       </div>
 

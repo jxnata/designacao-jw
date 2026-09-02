@@ -94,7 +94,11 @@ export default function Impressao() {
         const bytes = await gerarS89(dadosFormulario);
 
         const numero = item.parte.numero != null ? String(item.parte.numero).padStart(2, "0") : "00";
-        const nomeArquivo = `${semana.ano}-S${String(semana.semana_iso).padStart(2, "0")}-p${numero}-${slug(dadosFormulario.nome)}.pdf`;
+        // A sala entra no nome do arquivo para não sobrescrever o S-89 do
+        // salão principal quando a mesma parte tem designações em mais de
+        // uma sala na mesma semana.
+        const sufixoSala = dadosFormulario.sala === "principal" ? "" : `-sala${dadosFormulario.sala.toUpperCase()}`;
+        const nomeArquivo = `${semana.ano}-S${String(semana.semana_iso).padStart(2, "0")}-p${numero}${sufixoSala}-${slug(dadosFormulario.nome)}.pdf`;
 
         arquivos.push({
           caminho_relativo: `S-89/${nomeArquivo}`,

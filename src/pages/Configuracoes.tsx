@@ -133,6 +133,33 @@ export default function Configuracoes() {
         </label>
       </div>
 
+      <div className="mb-4 space-y-2 border-t border-slate-200 pt-3">
+        <p className="text-xs font-medium text-slate-600">Salas adicionais</p>
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={config.sala_b}
+            onChange={(e) =>
+              setConfig({
+                ...config,
+                sala_b: e.target.checked,
+                sala_c: e.target.checked ? config.sala_c : false,
+              })
+            }
+          />
+          Usar Sala B (leitura e ministério com designações próprias)
+        </label>
+        <label className="flex items-center gap-2 text-sm text-slate-700 disabled:opacity-50">
+          <input
+            type="checkbox"
+            checked={config.sala_b ? config.sala_c : false}
+            disabled={!config.sala_b}
+            onChange={(e) => setConfig({ ...config, sala_c: e.target.checked })}
+          />
+          <span className={!config.sala_b ? "opacity-50" : undefined}>Usar Sala C</span>
+        </label>
+      </div>
+
       <button className="inline-flex items-center gap-1.5 rounded bg-teal-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-800">
         <Save className="size-4" />
         Salvar

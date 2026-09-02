@@ -103,5 +103,16 @@ pub fn migrations() -> Vec<Migration> {
             ALTER TABLE config ADD COLUMN usar_anciaos_leitura_ebc INTEGER NOT NULL DEFAULT 0;
         "#,
         },
+        Migration {
+            version: 5,
+            description: "salas adicionais (sala b e sala c)",
+            kind: MigrationKind::Up,
+            sql: r#"
+            ALTER TABLE config ADD COLUMN sala_b INTEGER NOT NULL DEFAULT 0;
+            ALTER TABLE config ADD COLUMN sala_c INTEGER NOT NULL DEFAULT 0;
+            ALTER TABLE designacoes ADD COLUMN sala TEXT NOT NULL DEFAULT 'principal'
+                CHECK (sala IN ('principal','b','c'));
+        "#,
+        },
     ]
 }

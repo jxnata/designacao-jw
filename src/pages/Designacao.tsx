@@ -26,11 +26,11 @@ import {
   listarSemanas,
   salvarDesignacoes,
 } from "../lib/db";
-import { carregarPreviewExistente, gerarPreview, montarUnidades } from "../lib/designacao";
+import { carregarPreviewExistente, gerarPreview, montarUnidades, parsearChave } from "../lib/designacao";
 import { elegivel, elegivelAjudante } from "../lib/regras";
 import { CORES_SECAO, SECAO_POR_TIPO } from "../lib/secoes";
-import { ROTULO_TIPO } from "../lib/types";
-import type { Config, ItemPreview, Pessoa, Semana } from "../lib/types";
+import { ROTULO_SALA, ROTULO_TIPO } from "../lib/types";
+import type { Config, ItemPreview, Pessoa, Sala, Semana } from "../lib/types";
 
 export default function Designacao() {
   const [semanas, setSemanas] = useState<Semana[]>([]);
@@ -177,13 +177,17 @@ export default function Designacao() {
   async function confirmarEGerar() {
     if (!preview) return;
     const semanaIds = [...new Set(preview.map((i) => i.semana_id))];
-    const designacoes = preview.map((i) => ({
-      semana_id: i.semana_id,
-      parte_id: i.parte_id.includes(":parte:") ? Number(i.parte_id.split(":parte:")[1]) : null,
-      tipo: i.tipo,
-      pessoa_id: i.pessoa_id,
-      ajudante_id: i.ajudante_id,
-    }));
+    const designacoes = preview.map((i) => {
+      const { parte_id } = parsearChave(i.parte_id);
+      return {
+        semana_id: i.semana_id,
+        parte_id,
+        tipo: i.tipo,
+        pessoa_id: i.pessoa_id,
+        ajudante_id: i.ajudante_id,
+        sala: i.sala,
+      };
+    });
     await salvarDesignacoes(semanaIds, designacoes);
     for (const id of semanaIds) await atualizarStatusSemana(id, "final");
     setPreview(null);
@@ -259,32 +263,51 @@ export default function Designacao() {
         <div className="space-y-6">
           {[...porSemana.entries()].map(([semanaId, itens]) => {
             const semana = semanas.find((s) => s.id === semanaId);
+            const porSala = new Map<Sala, ItemPreview[]>();
+            for (const item of itens) {
+              if (!porSala.has(item.sala)) porSala.set(item.sala, []);
+              porSala.get(item.sala)!.push(item);
+            }
+            const ordemSalas: Sala[] = ["principal", "b", "c"];
             return (
               <div key={semanaId} className="rounded border border-slate-200 bg-white p-4">
                 <h2 className="mb-3 text-sm font-semibold text-slate-700">
                   {semana?.intervalo_texto} — {semana?.leitura_semanal}
                 </h2>
-                <div className="space-y-2">
-                  {itens.map((item) => (
-                    <LinhaPreview
-                      key={item.parte_id}
-                      item={item}
-                      pessoas={pessoas}
-                      pessoasPorId={pessoasPorId}
-                      contagemPorPessoa={contagemPorPessoa}
-                      mostrarTodos={mostrarTodos.has(item.parte_id)}
-                      onToggleMostrarTodos={() =>
-                        setMostrarTodos((s) => {
-                          const novo = new Set(s);
-                          novo.has(item.parte_id) ? novo.delete(item.parte_id) : novo.add(item.parte_id);
-                          return novo;
-                        })
-                      }
-                      onChange={(campo, valor) => atualizarItem(item.parte_id, campo, valor)}
-                      onInverterAjudante={() => inverterAjudante(item.parte_id)}
-                      config={config}
-                    />
-                  ))}
+                <div className="space-y-4">
+                  {ordemSalas
+                    .filter((sala) => porSala.has(sala))
+                    .map((sala) => (
+                      <div key={sala}>
+                        {sala !== "principal" && (
+                          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            {ROTULO_SALA[sala]}
+                          </h3>
+                        )}
+                        <div className="space-y-2">
+                          {porSala.get(sala)!.map((item) => (
+                            <LinhaPreview
+                              key={item.parte_id}
+                              item={item}
+                              pessoas={pessoas}
+                              pessoasPorId={pessoasPorId}
+                              contagemPorPessoa={contagemPorPessoa}
+                              mostrarTodos={mostrarTodos.has(item.parte_id)}
+                              onToggleMostrarTodos={() =>
+                                setMostrarTodos((s) => {
+                                  const novo = new Set(s);
+                                  novo.has(item.parte_id) ? novo.delete(item.parte_id) : novo.add(item.parte_id);
+                                  return novo;
+                                })
+                              }
+                              onChange={(campo, valor) => atualizarItem(item.parte_id, campo, valor)}
+                              onInverterAjudante={() => inverterAjudante(item.parte_id)}
+                              config={config}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
                 </div>
               </div>
             );

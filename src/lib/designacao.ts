@@ -15,9 +15,34 @@ import type {
   ParteParaDesignar,
   Pessoa,
   PessoaAssign,
+  Sala,
   Semana,
 } from "./types";
 import { ROTULO_TIPO } from "./types";
+import { SECAO_POR_TIPO } from "./secoes";
+
+/** Salas adicionais, na ordem em que devem aparecer (depois do salão
+ * principal). Sala C só faz sentido quando a Sala B também está ativa — essa
+ * regra já é reforçada na tela de Configurações. */
+const SALAS_ADICIONAIS: Sala[] = ["b", "c"];
+
+/** Monta a chave sintética de uma unidade de designação. Salas adicionais
+ * ganham um sufixo `@sala` — o salão principal não leva sufixo, para não
+ * quebrar dados/edições já gravados antes da feature de salas existir. */
+export function chaveUnidade(semanaId: number, sufixo: string, sala: Sala): string {
+  const base = `${semanaId}:${sufixo}`;
+  return sala === "principal" ? base : `${base}@${sala}`;
+}
+
+/** Desfaz `chaveUnidade`, devolvendo a semana, o `parte_id` numérico (ou
+ * `null` para presidente/orações) e a sala. */
+export function parsearChave(chave: string): { semana_id: number; parte_id: number | null; sala: Sala } {
+  const [semSala, sufixoSala] = chave.split("@") as [string, Sala | undefined];
+  const sala: Sala = sufixoSala ?? "principal";
+  const [semanaIdTexto, , parteIdTexto] = semSala.split(":");
+  const parte_id = semSala.includes(":parte:") ? Number(parteIdTexto) : null;
+  return { semana_id: Number(semanaIdTexto), parte_id, sala };
+}
 
 function paraAssign(p: Pessoa): PessoaAssign {
   return { ...p, sexo: p.sexo };
@@ -27,15 +52,20 @@ function paraAssign(p: Pessoa): PessoaAssign {
  * ordem em que aparecem no programa: presidente, oração inicial, as partes
  * extraídas do wol (tesouros/ministério/vida cristã/estudo) e oração
  * final. Presidente e orações não vêm da apostila — são papéis que a
- * própria congregação preenche toda semana. */
+ * própria congregação preenche toda semana.
+ *
+ * Quando a congregação usa salas adicionais (`sala_b`/`sala_c`), cada sala
+ * ativa ganha seu próprio presidente e sua própria réplica das partes de
+ * Leitura da Bíblia e Faça Seu Melhor no Ministério — as únicas que fazem
+ * sentido fora do salão principal. */
 export function unidadesDaSemana(
   semana: Semana,
   partes: Parte[],
-  config: Pick<Config, "congregacao_sinais">,
+  config: Pick<Config, "congregacao_sinais" | "sala_b" | "sala_c">,
 ): ItemPreview[] {
   const unidades: ItemPreview[] = [];
   unidades.push({
-    parte_id: `${semana.id}:presidente`,
+    parte_id: chaveUnidade(semana.id, "presidente", "principal"),
     semana_id: semana.id,
     tipo: "presidente",
     titulo: ROTULO_TIPO.presidente,
@@ -43,9 +73,10 @@ export function unidadesDaSemana(
     tem_ajudante: false,
     pessoa_id: null,
     ajudante_id: null,
+    sala: "principal",
   });
   unidades.push({
-    parte_id: `${semana.id}:oracao_inicial`,
+    parte_id: chaveUnidade(semana.id, "oracao_inicial", "principal"),
     semana_id: semana.id,
     tipo: "oracao_inicial",
     titulo: ROTULO_TIPO.oracao_inicial,
@@ -53,10 +84,11 @@ export function unidadesDaSemana(
     tem_ajudante: false,
     pessoa_id: null,
     ajudante_id: null,
+    sala: "principal",
   });
   for (const p of partes) {
     unidades.push({
-      parte_id: `${semana.id}:parte:${p.id}`,
+      parte_id: chaveUnidade(semana.id, `parte:${p.id}`, "principal"),
       semana_id: semana.id,
       tipo: p.tipo,
       titulo: p.titulo,
@@ -68,10 +100,11 @@ export function unidadesDaSemana(
       tem_ajudante: p.tipo === "estudo_biblico" ? !config.congregacao_sinais : p.tem_ajudante,
       pessoa_id: null,
       ajudante_id: null,
+      sala: "principal",
     });
   }
   unidades.push({
-    parte_id: `${semana.id}:oracao_final`,
+    parte_id: chaveUnidade(semana.id, "oracao_final", "principal"),
     semana_id: semana.id,
     tipo: "oracao_final",
     titulo: ROTULO_TIPO.oracao_final,
@@ -79,7 +112,40 @@ export function unidadesDaSemana(
     tem_ajudante: false,
     pessoa_id: null,
     ajudante_id: null,
+    sala: "principal",
   });
+
+  const partesMinisterio = partes.filter((p) => SECAO_POR_TIPO[p.tipo] === "ministerio");
+  const salasAtivas = SALAS_ADICIONAIS.filter(
+    (sala) => (sala === "b" && config.sala_b) || (sala === "c" && config.sala_b && config.sala_c),
+  );
+  for (const sala of salasAtivas) {
+    unidades.push({
+      parte_id: chaveUnidade(semana.id, "presidente", sala),
+      semana_id: semana.id,
+      tipo: "presidente",
+      titulo: ROTULO_TIPO.presidente,
+      duracao_min: 0,
+      tem_ajudante: false,
+      pessoa_id: null,
+      ajudante_id: null,
+      sala,
+    });
+    for (const p of partesMinisterio) {
+      unidades.push({
+        parte_id: chaveUnidade(semana.id, `parte:${p.id}`, sala),
+        semana_id: semana.id,
+        tipo: p.tipo,
+        titulo: p.titulo,
+        duracao_min: p.duracao_min,
+        tem_ajudante: p.tem_ajudante,
+        pessoa_id: null,
+        ajudante_id: null,
+        sala,
+      });
+    }
+  }
+
   return unidades;
 }
 
@@ -105,7 +171,8 @@ export async function carregarPreviewExistente(semanas: Semana[]): Promise<ItemP
   for (const s of semanas) {
     const designacoes = await listarDesignacoesPorSemana(s.id);
     for (const d of designacoes) {
-      const chave = d.parte_id ? `${s.id}:parte:${d.parte_id}` : `${s.id}:${d.tipo}`;
+      const sufixo = d.parte_id ? `parte:${d.parte_id}` : d.tipo;
+      const chave = chaveUnidade(s.id, sufixo, d.sala);
       porChave.set(chave, { pessoa_id: d.pessoa_id, ajudante_id: d.ajudante_id });
     }
   }
@@ -159,7 +226,9 @@ export async function gerarPreview(
   const porId = new Map(resultado.map((r) => [r.parte_id, r]));
   const presidentePorSemana = new Map<number, number | null>();
   for (const u of unidades) {
-    if (u.tipo === "presidente") {
+    // A oração inicial sempre acompanha o presidente do salão principal,
+    // mesmo quando há salas adicionais com presidente próprio.
+    if (u.tipo === "presidente" && u.sala === "principal") {
       presidentePorSemana.set(u.semana_id, porId.get(u.parte_id)?.pessoa_id ?? null);
     }
   }

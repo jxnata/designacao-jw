@@ -1,20 +1,28 @@
 import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFNumber, PDFString, StandardFonts, rgb } from "pdf-lib";
 import s89Url from "../assets/S-89_T.pdf?url";
 import { SECAO_POR_TIPO } from "./secoes";
-import type { Designacao, Parte, Pessoa } from "./types";
+import type { Designacao, Parte, Pessoa, Sala } from "./types";
 
 export interface DadosS89 {
   nome: string;
   ajudante: string; // "" quando não há ajudante
   data: string; // dd/MM/yyyy
   numeroParte: string;
+  sala: Sala;
 }
 
 const CAMPO_NOME = "900_1_Text_SanSerif";
 const CAMPO_AJUDANTE = "900_2_Text_SanSerif";
 const CAMPO_DATA = "900_3_Text_SanSerif";
 const CAMPO_NUMERO = "900_4_Text_SanSerif";
-const CAMPO_SALAO_PRINCIPAL = "900_5_CheckBox";
+
+/** O template já traz um checkbox por sala — marcamos o correspondente à
+ * sala da designação. */
+const CAMPO_SALA: Record<Sala, string> = {
+  principal: "900_5_CheckBox",
+  b: "900_6_CheckBox",
+  c: "900_7_CheckBox",
+};
 
 let bytesTemplateCache: ArrayBuffer | null = null;
 
@@ -56,7 +64,8 @@ export async function gerarS89(dados: DadosS89): Promise<Uint8Array> {
   const acroForm = pdfDoc.catalog.getOrCreateAcroForm();
 
   const camposDeTexto = new Set([CAMPO_NOME, CAMPO_AJUDANTE, CAMPO_DATA, CAMPO_NUMERO]);
-  let retanguloSalaoPrincipal: { x: number; y: number; width: number; height: number } | null = null;
+  const camposDeSala = new Set(Object.values(CAMPO_SALA));
+  const retangulosPorSala = new Map<string, { x: number; y: number; width: number; height: number }>();
 
   if (anotacoes) {
     for (let i = anotacoes.size() - 1; i >= 0; i--) {
@@ -69,11 +78,14 @@ export async function gerarS89(dados: DadosS89): Promise<Uint8Array> {
 
       if (camposDeTexto.has(nomeCampo)) {
         acroForm.addField(ref as never);
-      } else if (nomeCampo === CAMPO_SALAO_PRINCIPAL) {
+      } else if (camposDeSala.has(nomeCampo)) {
+        // Os três checkboxes de sala têm o mesmo problema de aparência (ver
+        // comentário da função) — removemos todos e desenhamos manualmente
+        // só o "X" da sala da designação atual.
         const rect = widget.lookup(PDFName.of("Rect"));
         if (rect instanceof PDFArray) {
           const [x0, y0, x1, y1] = rect.asArray().map((n) => (n as PDFNumber).asNumber());
-          retanguloSalaoPrincipal = { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
+          retangulosPorSala.set(nomeCampo, { x: x0, y: y0, width: x1 - x0, height: y1 - y0 });
         }
         anotacoes.remove(i);
       }
@@ -99,8 +111,10 @@ export async function gerarS89(dados: DadosS89): Promise<Uint8Array> {
   definirTexto(CAMPO_DATA, dados.data);
   definirTexto(CAMPO_NUMERO, dados.numeroParte);
 
-  if (retanguloSalaoPrincipal) {
-    const { x, y, width, height } = retanguloSalaoPrincipal;
+  const nomeCampoSala = CAMPO_SALA[dados.sala];
+  const retanguloSala = retangulosPorSala.get(nomeCampoSala);
+  if (retanguloSala) {
+    const { x, y, width, height } = retanguloSala;
     const tamanho = Math.min(width, height) * 0.72;
     pagina.drawText("X", {
       x: x + (width - tamanho * 0.62) / 2,
@@ -110,7 +124,7 @@ export async function gerarS89(dados: DadosS89): Promise<Uint8Array> {
       color: rgb(0, 0, 0),
     });
   } else {
-    console.warn(`Checkbox "${CAMPO_SALAO_PRINCIPAL}" não encontrado no S-89`);
+    console.warn(`Checkbox "${nomeCampoSala}" não encontrado no S-89`);
   }
 
   form.flatten();
@@ -154,5 +168,6 @@ export function dadosS89DeDesignacao(
     ajudante,
     data,
     numeroParte: parte.numero != null ? String(parte.numero) : "",
+    sala: designacao.sala,
   };
 }
