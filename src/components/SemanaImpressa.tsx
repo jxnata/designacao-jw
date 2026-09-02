@@ -46,7 +46,7 @@ export default function SemanaImpressa({ semana, partes, designacoes, pessoasPor
   function nome(d?: Designacao): string {
     if (!d?.pessoa_id) return "";
     const principal = pessoasPorId.get(d.pessoa_id)?.nome ?? "";
-    if (d.ajudante_id) {
+    if (d.ajudante_id && d.tipo !== "estudo_biblico") {
       const aj = pessoasPorId.get(d.ajudante_id)?.nome ?? "";
       return aj ? `${principal} & ${aj}` : principal;
     }
@@ -65,6 +65,8 @@ export default function SemanaImpressa({ semana, partes, designacoes, pessoasPor
     const d = porTipo.get(`parte:${parte.id}`);
     const rotulo = rotuloPapel(parte.tipo);
     const emLinha = rotuloEmLinha(parte.tipo);
+    const leitor =
+      parte.tipo === "estudo_biblico" && d?.ajudante_id ? pessoasPorId.get(d.ajudante_id)?.nome : null;
     return (
       <div className="linha-impressa grid grid-cols-[46px_1fr_200px] items-start gap-2 py-[3px] text-[10.5px] leading-tight">
         <div className="pt-0.5 text-slate-500">{horarios[`parte_${parte.id}`]}</div>
@@ -75,6 +77,12 @@ export default function SemanaImpressa({ semana, partes, designacoes, pessoasPor
           <div>
             {rotulo && <span className="text-[9px] text-slate-500">{rotulo} </span>}
             <span className="font-medium">{nome(d)}</span>
+            {leitor && (
+              <div>
+                <span className="text-[9px] text-slate-500">Leitor: </span>
+                <span className="font-medium">{leitor}</span>
+              </div>
+            )}
           </div>
         ) : (
           <div>

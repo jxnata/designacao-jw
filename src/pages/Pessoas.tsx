@@ -1,7 +1,7 @@
 import { confirm } from "@tauri-apps/plugin-dialog";
 import { useEffect, useState } from "react";
-import { excluirPessoa, listarPessoas, salvarPessoa } from "../lib/db";
-import type { Pessoa } from "../lib/types";
+import { excluirPessoa, getConfig, listarPessoas, salvarPessoa } from "../lib/db";
+import type { Config, Pessoa } from "../lib/types";
 
 type FormState = Omit<Pessoa, "id"> & { id?: number };
 
@@ -19,6 +19,7 @@ const VAZIO: FormState = {
 
 export default function Pessoas() {
   const [pessoas, setPessoas] = useState<Pessoa[]>([]);
+  const [config, setConfig] = useState<Config | null>(null);
   const [form, setForm] = useState<FormState>(VAZIO);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -27,7 +28,9 @@ export default function Pessoas() {
   async function recarregar() {
     setCarregando(true);
     try {
-      setPessoas(await listarPessoas(true));
+      const [lista, cfg] = await Promise.all([listarPessoas(true), getConfig()]);
+      setPessoas(lista);
+      setConfig(cfg);
     } catch (e) {
       setErro(String(e));
     } finally {
@@ -38,6 +41,8 @@ export default function Pessoas() {
   useEffect(() => {
     recarregar();
   }, []);
+
+  const mostrarSurdo = config?.congregacao_sinais ?? false;
 
   function editar(p: Pessoa) {
     setForm(p);
@@ -51,7 +56,7 @@ export default function Pessoas() {
     e.preventDefault();
     if (!form.nome.trim()) return;
     try {
-      await salvarPessoa(form);
+      await salvarPessoa({ ...form, surdo: mostrarSurdo ? form.surdo : false });
       setForm(VAZIO);
       await recarregar();
     } catch (e) {
@@ -114,7 +119,7 @@ export default function Pessoas() {
                         p.servo && "Servo",
                         p.batizado && "Batizado",
                         p.publicador && "Publicador",
-                        p.surdo && "Surdo",
+                        mostrarSurdo && p.surdo && "Surdo",
                       ]
                         .filter(Boolean)
                         .join(", ") || "—"}
@@ -209,11 +214,13 @@ export default function Pessoas() {
         </div>
 
         <div className="mb-3 space-y-1.5">
-          <Checkbox
-            label="Surdo"
-            checked={form.surdo}
-            onChange={(v) => setForm({ ...form, surdo: v })}
-          />
+          {mostrarSurdo && (
+            <Checkbox
+              label="Surdo"
+              checked={form.surdo}
+              onChange={(v) => setForm({ ...form, surdo: v })}
+            />
+          )}
           <Checkbox
             label="Publicador"
             checked={form.publicador}

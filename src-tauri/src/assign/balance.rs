@@ -76,6 +76,12 @@ pub struct ConfiguracaoDesignacao {
     /// congregações essa parte é reservada a publicadores/estudantes em
     /// desenvolvimento, então o default é excluir anciãos.
     pub usar_anciaos_leitura: bool,
+    /// Se anciãos podem ser designados como leitor do Estudo Bíblico de
+    /// Congregação — só é relevante em congregações comuns (o slot de
+    /// leitor não existe em congregação de língua de sinais, onde a
+    /// condução já é toda em sinais). Default `false`, na mesma linha de
+    /// `usar_anciaos_leitura`.
+    pub usar_anciaos_leitura_ebc: bool,
 }
 
 impl Default for ConfiguracaoDesignacao {
@@ -84,6 +90,7 @@ impl Default for ConfiguracaoDesignacao {
             usar_servos_presidencia: true,
             usar_servos_estudo_biblico: true,
             usar_anciaos_leitura: false,
+            usar_anciaos_leitura_ebc: false,
         }
     }
 }
@@ -274,7 +281,7 @@ pub fn gerar_atribuicoes(
                     let candidatos_aj: Vec<&Pessoa> = pessoas
                         .iter()
                         .filter(|p| !usados_na_semana.contains(&p.id))
-                        .filter(|p| elegivel_ajudante(estudante.sexo, p))
+                        .filter(|p| elegivel_ajudante(parte.tipo, estudante.sexo, p, &config))
                         .collect();
                     let mut rng_aj = rand::thread_rng();
                     let sorteios_aj: Vec<u32> =

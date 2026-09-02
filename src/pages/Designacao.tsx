@@ -4,25 +4,28 @@ import { useNavigate } from "react-router-dom";
 import {
   atualizarStatusSemana,
   excluirSemana,
+  getConfig,
   importarSemanas,
   listarPessoas,
   listarSemanas,
   salvarDesignacoes,
 } from "../lib/db";
-import { gerarPreview, montarUnidades } from "../lib/designacao";
-import { ordenarParaSelect } from "../lib/regras";
+import { carregarPreviewExistente, gerarPreview, montarUnidades } from "../lib/designacao";
+import { elegivelAjudante, ordenarParaSelect } from "../lib/regras";
 import { CORES_SECAO, SECAO_POR_TIPO } from "../lib/secoes";
 import { ROTULO_TIPO } from "../lib/types";
-import type { ItemPreview, Pessoa, Semana } from "../lib/types";
+import type { Config, ItemPreview, Pessoa, Semana } from "../lib/types";
 
 export default function Designacao() {
   const [semanas, setSemanas] = useState<Semana[]>([]);
   const [pessoas, setPessoas] = useState<Pessoa[]>([]);
+  const [config, setConfig] = useState<Config | null>(null);
   const [selecionadas, setSelecionadas] = useState<Set<number>>(new Set());
   const [adicionando, setAdicionando] = useState(false);
   const [quantidade, setQuantidade] = useState(1);
   const [gerandoPreview, setGerandoPreview] = useState(false);
   const [preview, setPreview] = useState<ItemPreview[] | null>(null);
+  const [modoPreview, setModoPreview] = useState<"gerar" | "editar">("gerar");
   const [mostrarTodos, setMostrarTodos] = useState<Set<string>>(new Set());
   const [erro, setErro] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -30,6 +33,7 @@ export default function Designacao() {
   async function recarregar() {
     setSemanas(await listarSemanas());
     setPessoas(await listarPessoas(false));
+    setConfig(await getConfig());
   }
 
   useEffect(() => {
@@ -86,12 +90,33 @@ export default function Designacao() {
     try {
       const unidades = await montarUnidades(semanasEscolhidas);
       const preenchido = await gerarPreview(semanasEscolhidas, unidades);
+      setModoPreview("gerar");
       setPreview(preenchido);
     } catch (e) {
       setErro(String(e));
     } finally {
       setGerandoPreview(false);
     }
+  }
+
+  async function editarSemanas(ids: number[]) {
+    const semanasEscolhidas = semanas.filter((s) => ids.includes(s.id) && s.status === "final");
+    if (semanasEscolhidas.length === 0) return;
+    setErro(null);
+    setGerandoPreview(true);
+    try {
+      const preenchido = await carregarPreviewExistente(semanasEscolhidas);
+      setModoPreview("editar");
+      setPreview(preenchido);
+    } catch (e) {
+      setErro(String(e));
+    } finally {
+      setGerandoPreview(false);
+    }
+  }
+
+  function editarSelecionadas() {
+    editarSemanas([...selecionadas]);
   }
 
   function atualizarItem(parteId: string, campo: "pessoa_id" | "ajudante_id", valor: number | null) {
@@ -158,7 +183,11 @@ export default function Designacao() {
     return (
       <div>
         <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-lg font-semibold">Preview — confira e ajuste antes de gerar</h1>
+          <h1 className="text-lg font-semibold">
+            {modoPreview === "editar"
+              ? "Editar designações"
+              : "Preview — confira e ajuste antes de gerar"}
+          </h1>
           <div className="flex gap-2">
             <button
               className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100"
@@ -170,7 +199,7 @@ export default function Designacao() {
               className="rounded bg-teal-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-800"
               onClick={confirmarEGerar}
             >
-              Confirmar e gerar
+              {modoPreview === "editar" ? "Salvar alterações" : "Confirmar e gerar"}
             </button>
           </div>
         </div>
@@ -201,6 +230,7 @@ export default function Designacao() {
                       }
                       onChange={(campo, valor) => atualizarItem(item.parte_id, campo, valor)}
                       onInverterAjudante={() => inverterAjudante(item.parte_id)}
+                      config={config}
                     />
                   ))}
                 </div>
@@ -223,6 +253,13 @@ export default function Designacao() {
             disabled={tipoSelecao !== "com"}
           >
             Imprimir Designações
+          </button>
+          <button
+            className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50"
+            onClick={editarSelecionadas}
+            disabled={tipoSelecao !== "com" || gerandoPreview}
+          >
+            Editar Designações
           </button>
           <button
             className="rounded bg-teal-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-800 disabled:opacity-50"
@@ -265,7 +302,14 @@ export default function Designacao() {
                   <StatusBadge status={s.status} />
                 </td>
                 <td className="px-3 py-2 text-right">
-                  {!temDesignacao(s) && (
+                  {temDesignacao(s) ? (
+                    <button
+                      className="text-xs text-teal-700 hover:underline"
+                      onClick={() => editarSemanas([s.id])}
+                    >
+                      editar
+                    </button>
+                  ) : (
                     <button className="text-xs text-red-600 hover:underline" onClick={() => excluir(s.id)}>
                       excluir
                     </button>
@@ -334,6 +378,7 @@ function LinhaPreview({
   onToggleMostrarTodos,
   onChange,
   onInverterAjudante,
+  config,
 }: {
   item: ItemPreview;
   pessoas: Pessoa[];
@@ -343,14 +388,20 @@ function LinhaPreview({
   onToggleMostrarTodos: () => void;
   onChange: (campo: "pessoa_id" | "ajudante_id", valor: number | null) => void;
   onInverterAjudante: () => void;
+  config: Config | null;
 }) {
+  const ehLeitorEstudo = item.tipo === "estudo_biblico";
   const opcoes = mostrarTodos ? [...pessoas].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")) : ordenarParaSelect(item.tipo, pessoas);
   const pessoaEscolhida = item.pessoa_id ? pessoasPorId.get(item.pessoa_id) : null;
-  const opcoesAjudante = pessoaEscolhida
+  const opcoesAjudante = ehLeitorEstudo
     ? pessoas
-        .filter((p) => mostrarTodos || p.sexo === pessoaEscolhida.sexo)
+        .filter((p) => mostrarTodos || (config && elegivelAjudante(item.tipo, "", p, config)))
         .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
-    : [];
+    : pessoaEscolhida
+      ? pessoas
+          .filter((p) => mostrarTodos || p.sexo === pessoaEscolhida.sexo)
+          .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+      : [];
 
   const secao = SECAO_POR_TIPO[item.tipo];
   const cores = secao ? CORES_SECAO[secao] : null;
@@ -380,7 +431,7 @@ function LinhaPreview({
         ))}
       </select>
 
-      {item.tem_ajudante && (
+      {item.tem_ajudante && !ehLeitorEstudo && (
         <button
           type="button"
           className="shrink-0 rounded border border-slate-300 p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
@@ -403,7 +454,7 @@ function LinhaPreview({
           value={item.ajudante_id ?? ""}
           onChange={(e) => onChange("ajudante_id", e.target.value ? Number(e.target.value) : null)}
         >
-          <option value="">— ajudante —</option>
+          <option value="">{ehLeitorEstudo ? "— leitor —" : "— ajudante —"}</option>
           {opcoesAjudante.map((p) => (
             <option key={p.id} value={p.id}>
               {p.nome} ({contagemPorPessoa.get(p.id) ?? 0})

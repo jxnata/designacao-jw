@@ -60,6 +60,8 @@ export interface Config {
   usar_servos_presidencia: boolean;
   usar_servos_estudo_biblico: boolean;
   usar_anciaos_leitura: boolean;
+  congregacao_sinais: boolean;
+  usar_anciaos_leitura_ebc: boolean;
 }
 
 export interface ParteWeb {

@@ -2,10 +2,12 @@ import { invoke } from "@tauri-apps/api/core";
 import {
   getConfig,
   historicoParaBalanceador,
+  listarDesignacoesPorSemana,
   listarPartes,
   listarPessoas,
 } from "./db";
 import type {
+  Config,
   DesignacaoHistorica,
   DesignacaoResultado,
   ItemPreview,
@@ -26,7 +28,11 @@ function paraAssign(p: Pessoa): PessoaAssign {
  * extraídas do wol (tesouros/ministério/vida cristã/estudo) e oração
  * final. Presidente e orações não vêm da apostila — são papéis que a
  * própria congregação preenche toda semana. */
-export function unidadesDaSemana(semana: Semana, partes: Parte[]): ItemPreview[] {
+export function unidadesDaSemana(
+  semana: Semana,
+  partes: Parte[],
+  config: Pick<Config, "congregacao_sinais">,
+): ItemPreview[] {
   const unidades: ItemPreview[] = [];
   unidades.push({
     parte_id: `${semana.id}:presidente`,
@@ -55,7 +61,11 @@ export function unidadesDaSemana(semana: Semana, partes: Parte[]): ItemPreview[]
       tipo: p.tipo,
       titulo: p.titulo,
       duracao_min: p.duracao_min,
-      tem_ajudante: p.tem_ajudante,
+      // Estudo Bíblico de Congregação ganha o slot de leitor nas
+      // congregações comuns (alguém lê o parágrafo em voz alta enquanto o
+      // dirigente conduz) — em congregação de língua de sinais isso não
+      // existe, pois a condução já é toda em sinais.
+      tem_ajudante: p.tipo === "estudo_biblico" ? !config.congregacao_sinais : p.tem_ajudante,
       pessoa_id: null,
       ajudante_id: null,
     });
@@ -77,12 +87,32 @@ export function unidadesDaSemana(semana: Semana, partes: Parte[]): ItemPreview[]
  * todas elas, já na ordem cronológica (por `ordinal`). */
 export async function montarUnidades(semanas: Semana[]): Promise<ItemPreview[]> {
   const ordenadas = [...semanas].sort((a, b) => a.ordinal - b.ordinal);
+  const config = await getConfig();
   const todas: ItemPreview[] = [];
   for (const s of ordenadas) {
     const partes = await listarPartes(s.id);
-    todas.push(...unidadesDaSemana(s, partes));
+    todas.push(...unidadesDaSemana(s, partes, config));
   }
   return todas;
+}
+
+/** Carrega o preview editável de semanas já designadas (`status = 'final'`),
+ * preenchendo cada unidade com o que já está gravado — sem rodar o
+ * balanceador. Usado pela edição de designações existentes. */
+export async function carregarPreviewExistente(semanas: Semana[]): Promise<ItemPreview[]> {
+  const unidades = await montarUnidades(semanas);
+  const porChave = new Map<string, { pessoa_id: number | null; ajudante_id: number | null }>();
+  for (const s of semanas) {
+    const designacoes = await listarDesignacoesPorSemana(s.id);
+    for (const d of designacoes) {
+      const chave = d.parte_id ? `${s.id}:parte:${d.parte_id}` : `${s.id}:${d.tipo}`;
+      porChave.set(chave, { pessoa_id: d.pessoa_id, ajudante_id: d.ajudante_id });
+    }
+  }
+  return unidades.map((u) => {
+    const d = porChave.get(u.parte_id);
+    return d ? { ...u, pessoa_id: d.pessoa_id, ajudante_id: d.ajudante_id } : u;
+  });
 }
 
 /** Roda o balanceador em Rust sobre as unidades informadas e devolve o
@@ -122,6 +152,7 @@ export async function gerarPreview(
       usar_servos_presidencia: config.usar_servos_presidencia,
       usar_servos_estudo_biblico: config.usar_servos_estudo_biblico,
       usar_anciaos_leitura: config.usar_anciaos_leitura,
+      usar_anciaos_leitura_ebc: config.usar_anciaos_leitura_ebc,
     },
   });
 

@@ -83,8 +83,25 @@ pub fn elegivel(
     }
 }
 
-/// Elegibilidade do ajudante de uma demonstração: mesmo sexo do estudante
-/// designado, ativo, sem restrição de grupo.
-pub fn elegivel_ajudante(sexo_estudante: char, p: &Pessoa) -> bool {
-    p.ativo && p.sexo == sexo_estudante
+/// Elegibilidade do "ajudante" de uma parte. Para a demonstração de
+/// ministério, é o ajudante propriamente dito: mesmo sexo do estudante
+/// designado, ativo, sem restrição de grupo. Para o Estudo Bíblico de
+/// Congregação, esse mesmo slot é reaproveitado para o leitor (só existe em
+/// congregação de língua de sinais): homem batizado e ativo, com anciãos
+/// entrando apenas se `config.usar_anciaos_leitura_ebc` estiver ligado.
+pub fn elegivel_ajudante(
+    tipo: TipoParte,
+    sexo_estudante: char,
+    p: &Pessoa,
+    config: &ConfiguracaoDesignacao,
+) -> bool {
+    if !p.ativo {
+        return false;
+    }
+    match tipo {
+        TipoParte::EstudoBiblico => {
+            homem_batizado(p) && (config.usar_anciaos_leitura_ebc || !p.anciao)
+        }
+        _ => p.sexo == sexo_estudante,
+    }
 }

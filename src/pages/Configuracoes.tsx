@@ -103,6 +103,33 @@ export default function Configuracoes() {
           />
           Usar anciãos na Leitura da Bíblia
         </label>
+        <label className="flex items-center gap-2 text-sm text-slate-700 disabled:opacity-50">
+          <input
+            type="checkbox"
+            checked={config.congregacao_sinais ? false : config.usar_anciaos_leitura_ebc}
+            disabled={config.congregacao_sinais}
+            onChange={(e) =>
+              setConfig({ ...config, usar_anciaos_leitura_ebc: e.target.checked })
+            }
+          />
+          <span className={config.congregacao_sinais ? "opacity-50" : undefined}>
+            Usar anciãos na leitura do Estudo Bíblico de Congregação
+          </span>
+        </label>
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={config.congregacao_sinais}
+            onChange={(e) =>
+              setConfig({
+                ...config,
+                congregacao_sinais: e.target.checked,
+                usar_anciaos_leitura_ebc: e.target.checked ? false : config.usar_anciaos_leitura_ebc,
+              })
+            }
+          />
+          Congregação de Língua de Sinais
+        </label>
       </div>
 
       <button className="rounded bg-teal-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-800">
