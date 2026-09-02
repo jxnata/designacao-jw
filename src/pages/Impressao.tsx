@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { getConfig, listarDesignacoesPorSemana, listarPartes, listarPessoas, listarSemanas } from "../lib/db";
 import { dataDaReuniao, formatarData, slug } from "../lib/datas";
 import { dadosS89DeDesignacao, designacoesParaS89, gerarS89 } from "../lib/s89";
@@ -22,6 +23,8 @@ export default function Impressao() {
   const [gerando, setGerando] = useState<{ atual: number; total: number } | null>(null);
   const [mensagem, setMensagem] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const filtro = searchParams.get("semanas");
 
   useEffect(() => {
     (async () => {
@@ -33,7 +36,10 @@ export default function Impressao() {
       setConfig(cfg);
       setPessoasPorId(new Map(pessoas.map((p) => [p.id, p])));
 
-      const ordenadas = [...semanas].sort((a, b) => a.ordinal - b.ordinal);
+      const ids = filtro ? new Set(filtro.split(",").map(Number).filter(Number.isFinite)) : null;
+      const ordenadas = [...semanas]
+        .filter((s) => !ids || ids.has(s.id))
+        .sort((a, b) => a.ordinal - b.ordinal);
       const carregadas: Dados[] = [];
       for (const semana of ordenadas) {
         const [partes, designacoes] = await Promise.all([
@@ -44,7 +50,7 @@ export default function Impressao() {
       }
       setDados(carregadas);
     })();
-  }, []);
+  }, [filtro]);
 
   const totalS89 = useMemo(() => {
     if (!dados) return 0;
@@ -136,7 +142,9 @@ export default function Impressao() {
 
       {dados.length === 0 && (
         <p className="text-sm text-slate-400">
-          Nenhuma semana confirmada ainda. Gere e confirme um preview na aba Designação.
+          {filtro
+            ? "Nenhuma das semanas selecionadas foi encontrada."
+            : "Nenhuma semana confirmada ainda. Gere e confirme um preview na aba Designação."}
         </p>
       )}
 

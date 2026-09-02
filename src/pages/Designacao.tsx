@@ -19,8 +19,8 @@ export default function Designacao() {
   const [semanas, setSemanas] = useState<Semana[]>([]);
   const [pessoas, setPessoas] = useState<Pessoa[]>([]);
   const [selecionadas, setSelecionadas] = useState<Set<number>>(new Set());
-  const [buscando, setBuscando] = useState(false);
   const [adicionando, setAdicionando] = useState(false);
+  const [quantidade, setQuantidade] = useState(1);
   const [gerandoPreview, setGerandoPreview] = useState(false);
   const [preview, setPreview] = useState<ItemPreview[] | null>(null);
   const [mostrarTodos, setMostrarTodos] = useState<Set<string>>(new Set());
@@ -36,30 +36,15 @@ export default function Designacao() {
     recarregar();
   }, []);
 
-  async function buscarProgramacao() {
-    setErro(null);
-    setBuscando(true);
-    try {
-      const semanasWeb = await invoke("importar_semanas", { quantidade: 8 });
-      await importarSemanas(semanasWeb as never);
-      await recarregar();
-    } catch (e) {
-      setErro(String(e));
-    } finally {
-      setBuscando(false);
-    }
-  }
-
-  async function adicionarSemana() {
+  async function buscarSemanas() {
     const ultima = [...semanas].sort((a, b) => b.ordinal - a.ordinal)[0];
-    if (!ultima) return;
     setErro(null);
     setAdicionando(true);
     try {
       const semanasWeb = await invoke("importar_semanas", {
-        quantidade: 1,
-        anoApos: ultima.ano,
-        semanaIsoApos: ultima.semana_iso,
+        quantidade,
+        anoApos: ultima?.ano ?? null,
+        semanaIsoApos: ultima?.semana_iso ?? null,
       });
       await importarSemanas(semanasWeb as never);
       await recarregar();
@@ -70,13 +55,27 @@ export default function Designacao() {
     }
   }
 
+  function temDesignacao(s: Semana) {
+    return s.status === "final";
+  }
+
   function alternarSelecao(id: number) {
     setSelecionadas((s) => {
+      const semana = semanas.find((sem) => sem.id === id);
+      if (!semana) return s;
+      const primeira = semanas.find((sem) => s.has(sem.id));
+      if (primeira && temDesignacao(primeira) !== temDesignacao(semana) && !s.has(id)) return s;
       const novo = new Set(s);
       if (novo.has(id)) novo.delete(id);
       else novo.add(id);
       return novo;
     });
+  }
+
+  function imprimirSelecionadas() {
+    const ids = semanas.filter((s) => selecionadas.has(s.id) && temDesignacao(s)).map((s) => s.id);
+    if (ids.length === 0) return;
+    navigate(`/impressao?semanas=${ids.join(",")}`);
   }
 
   async function gerarPreviewClick() {
@@ -124,7 +123,7 @@ export default function Designacao() {
     setPreview(null);
     setSelecionadas(new Set());
     await recarregar();
-    navigate("/impressao");
+    navigate(`/impressao?semanas=${semanaIds.join(",")}`);
   }
 
   async function excluir(id: number) {
@@ -134,6 +133,11 @@ export default function Designacao() {
   }
 
   const pessoasPorId = useMemo(() => new Map(pessoas.map((p) => [p.id, p])), [pessoas]);
+
+  const tipoSelecao = useMemo(() => {
+    const primeira = semanas.find((s) => selecionadas.has(s.id));
+    return primeira ? (temDesignacao(primeira) ? "com" : "sem") : null;
+  }, [semanas, selecionadas]);
 
   const contagemPorPessoa = useMemo(() => {
     const m = new Map<number, number>();
@@ -215,15 +219,15 @@ export default function Designacao() {
         <div className="flex gap-2">
           <button
             className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50"
-            onClick={buscarProgramacao}
-            disabled={buscando}
+            onClick={imprimirSelecionadas}
+            disabled={tipoSelecao !== "com"}
           >
-            {buscando ? "Buscando…" : "Buscar programação (8 semanas)"}
+            Imprimir Designações
           </button>
           <button
             className="rounded bg-teal-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-800 disabled:opacity-50"
             onClick={gerarPreviewClick}
-            disabled={selecionadas.size === 0 || gerandoPreview}
+            disabled={tipoSelecao !== "sem" || gerandoPreview}
           >
             {gerandoPreview ? "Gerando…" : "Gerar Designações"}
           </button>
@@ -247,13 +251,13 @@ export default function Designacao() {
             {semanas.map((s) => (
               <tr key={s.id} className="border-t border-slate-100">
                 <td className="px-3 py-2">
-                  {s.status !== "final" && (
-                    <input
-                      type="checkbox"
-                      checked={selecionadas.has(s.id)}
-                      onChange={() => alternarSelecao(s.id)}
-                    />
-                  )}
+                  <input
+                    type="checkbox"
+                    checked={selecionadas.has(s.id)}
+                    disabled={tipoSelecao !== null && tipoSelecao !== (temDesignacao(s) ? "com" : "sem")}
+                    onChange={() => alternarSelecao(s.id)}
+                    className="disabled:opacity-40"
+                  />
                 </td>
                 <td className="px-3 py-2 font-medium">{s.intervalo_texto}</td>
                 <td className="px-3 py-2 text-slate-600">{s.leitura_semanal}</td>
@@ -261,11 +265,7 @@ export default function Designacao() {
                   <StatusBadge status={s.status} />
                 </td>
                 <td className="px-3 py-2 text-right">
-                  {s.status === "final" ? (
-                    <a href="#/impressao" className="text-xs text-teal-700 hover:underline">
-                      ver impressão
-                    </a>
-                  ) : (
+                  {!temDesignacao(s) && (
                     <button className="text-xs text-red-600 hover:underline" onClick={() => excluir(s.id)}>
                       excluir
                     </button>
@@ -276,7 +276,7 @@ export default function Designacao() {
             {semanas.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-3 py-6 text-center text-slate-400">
-                  Nenhuma semana importada ainda. Clique em "Buscar programação".
+                  Nenhuma semana importada ainda. Use o controle abaixo para buscar.
                 </td>
               </tr>
             )}
@@ -284,17 +284,29 @@ export default function Designacao() {
         </table>
       </div>
 
-      {semanas.length > 0 && (
-        <div className="mt-3">
-          <button
-            className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50"
-            onClick={adicionarSemana}
-            disabled={adicionando}
-          >
-            {adicionando ? "Adicionando…" : "Adicionar semana"}
-          </button>
-        </div>
-      )}
+      <div className="mt-3 flex items-center gap-2">
+        <span className="text-sm text-slate-600">Adicionar</span>
+        <input
+          type="number"
+          min={1}
+          max={8}
+          value={quantidade}
+          onChange={(e) => {
+            const valor = Number(e.target.value);
+            setQuantidade(Math.min(8, Math.max(1, Number.isNaN(valor) ? 1 : valor)));
+          }}
+          disabled={adicionando}
+          className="w-16 rounded border border-slate-300 px-2 py-1.5 text-sm disabled:opacity-50"
+        />
+        <span className="text-sm text-slate-600">semanas</span>
+        <button
+          className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50"
+          onClick={buscarSemanas}
+          disabled={adicionando}
+        >
+          {adicionando ? "Buscando…" : "Buscar"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -308,7 +320,7 @@ function StatusBadge({ status }: { status: Semana["status"] }) {
   const rotulos: Record<Semana["status"], string> = {
     importada: "Importada",
     preview: "Em preview",
-    final: "Confirmada",
+    final: "Designações feitas",
   };
   return <span className={`rounded px-2 py-0.5 text-xs ${estilos[status]}`}>{rotulos[status]}</span>;
 }
