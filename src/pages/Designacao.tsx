@@ -125,6 +125,15 @@ export default function Designacao() {
 
   const pessoasPorId = useMemo(() => new Map(pessoas.map((p) => [p.id, p])), [pessoas]);
 
+  const contagemPorPessoa = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const i of preview ?? []) {
+      if (i.pessoa_id != null) m.set(i.pessoa_id, (m.get(i.pessoa_id) ?? 0) + 1);
+      if (i.ajudante_id != null) m.set(i.ajudante_id, (m.get(i.ajudante_id) ?? 0) + 1);
+    }
+    return m;
+  }, [preview]);
+
   if (preview) {
     const porSemana = new Map<number, ItemPreview[]>();
     for (const item of preview) {
@@ -167,6 +176,7 @@ export default function Designacao() {
                       item={item}
                       pessoas={pessoas}
                       pessoasPorId={pessoasPorId}
+                      contagemPorPessoa={contagemPorPessoa}
                       mostrarTodos={mostrarTodos.has(item.parte_id)}
                       onToggleMostrarTodos={() =>
                         setMostrarTodos((s) => {
@@ -296,6 +306,7 @@ function LinhaPreview({
   item,
   pessoas,
   pessoasPorId,
+  contagemPorPessoa,
   mostrarTodos,
   onToggleMostrarTodos,
   onChange,
@@ -303,6 +314,7 @@ function LinhaPreview({
   item: ItemPreview;
   pessoas: Pessoa[];
   pessoasPorId: Map<number, Pessoa>;
+  contagemPorPessoa: Map<number, number>;
   mostrarTodos: boolean;
   onToggleMostrarTodos: () => void;
   onChange: (campo: "pessoa_id" | "ajudante_id", valor: number | null) => void;
@@ -338,7 +350,7 @@ function LinhaPreview({
         <option value="">— sem designação —</option>
         {opcoes.map((p) => (
           <option key={p.id} value={p.id}>
-            {p.nome}
+            {p.nome} ({contagemPorPessoa.get(p.id) ?? 0})
           </option>
         ))}
       </select>
@@ -352,7 +364,7 @@ function LinhaPreview({
           <option value="">— ajudante —</option>
           {opcoesAjudante.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.nome}
+              {p.nome} ({contagemPorPessoa.get(p.id) ?? 0})
             </option>
           ))}
         </select>
