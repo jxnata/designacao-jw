@@ -14,6 +14,7 @@ export function elegivel(tipo: TipoParte, p: Pessoa): boolean {
     case "tesouros":
     case "joias":
     case "vida_crista":
+    case "ministerio_consideracao":
       return p.anciao || p.servo;
     case "leitura":
       return p.sexo === "m";

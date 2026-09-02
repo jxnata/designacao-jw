@@ -1,4 +1,4 @@
-use chrono::{Datelike, Duration, Local, NaiveDate};
+use chrono::{Datelike, Duration, Local, NaiveDate, Weekday};
 use serde::Serialize;
 
 use super::parser::{self, ParseError, SemanaImportada};
@@ -23,15 +23,27 @@ pub struct SemanaComData {
     pub semana: SemanaImportada,
 }
 
-/// Busca a programação das próximas `quantidade` semanas (a partir da semana
-/// corrente), navegando `wol.jw.org` exatamente como um navegador faria:
-/// primeiro a página de reuniões da semana (que aponta o docId da apostila),
-/// depois o documento em si.
-pub async fn buscar_programacao(quantidade: u32) -> Result<Vec<SemanaComData>, WolError> {
+/// Busca a programação das próximas `quantidade` semanas, navegando
+/// `wol.jw.org` exatamente como um navegador faria: primeiro a página de
+/// reuniões da semana (que aponta o docId da apostila), depois o documento
+/// em si. Por padrão começa na semana corrente; se `apos` for informado
+/// (ano, semana ISO de uma semana já importada), começa na semana seguinte
+/// a ela — usado para "adicionar semana" no fim da lista.
+pub async fn buscar_programacao(
+    quantidade: u32,
+    apos: Option<(i32, u32)>,
+) -> Result<Vec<SemanaComData>, WolError> {
     let client = reqwest::Client::builder().user_agent(USER_AGENT).build()?;
 
     let mut resultado = Vec::with_capacity(quantidade as usize);
-    let mut data = Local::now().date_naive();
+    let mut data = match apos {
+        Some((ano, semana_iso)) => {
+            let base = NaiveDate::from_isoywd_opt(ano, semana_iso, Weekday::Mon)
+                .unwrap_or_else(|| Local::now().date_naive());
+            proxima_segunda(base)
+        }
+        None => Local::now().date_naive(),
+    };
 
     for _ in 0..quantidade {
         let iso = data.iso_week();

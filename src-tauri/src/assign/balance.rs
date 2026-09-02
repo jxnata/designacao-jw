@@ -6,9 +6,13 @@
 
 use std::collections::{HashMap, HashSet};
 
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-use super::rules::{elegivel, elegivel_ajudante, PENALIDADE_RECENTE, PENALIDADE_REFORCO};
+use super::rules::{
+    elegivel, elegivel_ajudante, PENALIDADE_RECENTE, PENALIDADE_REFORCO,
+    PENALIDADE_SEMANA_CONSECUTIVA,
+};
 use crate::wol::TipoParte;
 
 /// Quantas semanas (ordinais) contam como "recente" para penalizar repetir
@@ -58,6 +62,25 @@ pub struct DesignacaoResultado {
     pub parte_id: String,
     pub pessoa_id: Option<i64>,
     pub ajudante_id: Option<i64>,
+}
+
+/// Opções da congregação que afetam elegibilidade (ver `Configuracoes` na
+/// UI). Ambas defaultam para `true` — o comportamento histórico do app
+/// permitia servo ministerial como reforço nessas duas partes.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ConfiguracaoDesignacao {
+    pub usar_servos_presidencia: bool,
+    pub usar_servos_estudo_biblico: bool,
+}
+
+impl Default for ConfiguracaoDesignacao {
+    fn default() -> Self {
+        Self {
+            usar_servos_presidencia: true,
+            usar_servos_estudo_biblico: true,
+        }
+    }
 }
 
 #[derive(Default, Clone)]
@@ -112,6 +135,13 @@ impl Estado {
         *self.ultima_geral.get(&pessoa_id).unwrap_or(&-1)
     }
 
+    /// `true` quando a pessoa teve qualquer designação (estudante ou
+    /// ajudante) na semana imediatamente anterior a `agora` — usado para
+    /// evitar designações em semanas consecutivas.
+    fn designada_na_semana_anterior(&self, pessoa_id: i64, agora: i64) -> bool {
+        agora - self.ultima_geral(pessoa_id) == 1
+    }
+
     fn semanas_desde_ultimo_no_tipo(&self, pessoa_id: i64, tipo: TipoParte, agora: i64) -> i64 {
         match self.ultima_tipo.get(&(pessoa_id, tipo)) {
             Some(ultimo) => agora - ultimo,
@@ -134,9 +164,12 @@ impl Estado {
 }
 
 /// Chave de ordenação: menor é melhor. `f64` não implementa `Ord`, então
-/// comparamos com `total_cmp` via um wrapper leve.
+/// comparamos com `total_cmp` via um wrapper leve. O último campo é só um
+/// sorteio (não o nome) — quando os três primeiros critérios empatam de
+/// verdade, o desempate é aleatório em vez de sempre cair em ordem
+/// alfabética.
 #[derive(PartialEq, PartialOrd)]
-struct Chave(f64, f64, i64, String);
+struct Chave(f64, f64, i64, u32);
 
 fn escolher<'a>(
     candidatos: &[(&'a Pessoa, u32 /* penalidade extra */)],
@@ -144,31 +177,46 @@ fn escolher<'a>(
     estado: &Estado,
     agora: i64,
 ) -> Option<&'a Pessoa> {
+    let mut rng = rand::thread_rng();
+    let sorteios: Vec<u32> = (0..candidatos.len()).map(|_| rng.gen()).collect();
     candidatos
         .iter()
-        .min_by(|(pa, pena_a), (pb, pena_b)| {
-            let ka = chave(pa, tipo, estado, agora, *pena_a);
-            let kb = chave(pb, tipo, estado, agora, *pena_b);
+        .zip(sorteios)
+        .min_by(|((pa, pena_a), sa), ((pb, pena_b), sb)| {
+            let ka = chave(pa, tipo, estado, agora, *pena_a, *sa);
+            let kb = chave(pb, tipo, estado, agora, *pena_b, *sb);
             ka.0.total_cmp(&kb.0)
                 .then(ka.1.total_cmp(&kb.1))
                 .then(ka.2.cmp(&kb.2))
                 .then(ka.3.cmp(&kb.3))
         })
-        .map(|(p, _)| *p)
+        .map(|((p, _), _)| *p)
 }
 
-fn chave(p: &Pessoa, tipo: TipoParte, estado: &Estado, agora: i64, penalidade_extra: u32) -> Chave {
+fn chave(
+    p: &Pessoa,
+    tipo: TipoParte,
+    estado: &Estado,
+    agora: i64,
+    penalidade_extra: u32,
+    sorteio: u32,
+) -> Chave {
     let recente = estado.semanas_desde_ultimo_no_tipo(p.id, tipo, agora) < JANELA_RECENCIA_SEMANAS;
     let penalidade_recencia = if recente { PENALIDADE_RECENTE } else { 0 };
-    let qtd_tipo_ajustada =
-        estado.qtd_tipo(p.id, tipo) as f64 + (penalidade_recencia + penalidade_extra) as f64;
+    let penalidade_consecutiva = if estado.designada_na_semana_anterior(p.id, agora) {
+        PENALIDADE_SEMANA_CONSECUTIVA
+    } else {
+        0
+    };
+    let qtd_tipo_ajustada = estado.qtd_tipo(p.id, tipo) as f64
+        + (penalidade_recencia + penalidade_extra + penalidade_consecutiva) as f64;
     Chave(
         qtd_tipo_ajustada,
         estado.pontos_total(p.id),
         // DESC = quem está há mais tempo sem designação vem primeiro, então
         // negamos para caber num sort ascendente.
         -estado.ultima_geral(p.id),
-        p.nome.clone(),
+        sorteio,
     )
 }
 
@@ -180,6 +228,7 @@ pub fn gerar_atribuicoes(
     pessoas: &[Pessoa],
     historico: &[DesignacaoHistorica],
     partes: &[ParteParaDesignar],
+    config: ConfiguracaoDesignacao,
 ) -> Vec<DesignacaoResultado> {
     let mut estado = Estado::novo(historico);
     let mut resultado = Vec::with_capacity(partes.len());
@@ -203,7 +252,7 @@ pub fn gerar_atribuicoes(
                 .iter()
                 .filter(|p| !usados_na_semana.contains(&p.id))
                 .filter_map(|p| {
-                    elegivel(parte.tipo, p)
+                    elegivel(parte.tipo, p, &config)
                         .map(|reforco| (p, if reforco { PENALIDADE_REFORCO } else { 0 }))
                 })
                 .collect();
@@ -222,11 +271,28 @@ pub fn gerar_atribuicoes(
                         .filter(|p| !usados_na_semana.contains(&p.id))
                         .filter(|p| elegivel_ajudante(estudante.sexo, p))
                         .collect();
-                    let aj = candidatos_aj.into_iter().min_by(|a, b| {
-                        let ca = *estado.contagem_ajudante.get(&a.id).unwrap_or(&0);
-                        let cb = *estado.contagem_ajudante.get(&b.id).unwrap_or(&0);
-                        ca.cmp(&cb).then_with(|| a.nome.cmp(&b.nome))
-                    });
+                    let mut rng_aj = rand::thread_rng();
+                    let sorteios_aj: Vec<u32> =
+                        (0..candidatos_aj.len()).map(|_| rng_aj.gen()).collect();
+                    let aj = candidatos_aj
+                        .into_iter()
+                        .zip(sorteios_aj)
+                        .min_by(|(a, sa), (b, sb)| {
+                            let ca = *estado.contagem_ajudante.get(&a.id).unwrap_or(&0)
+                                + if estado.designada_na_semana_anterior(a.id, semana_ordinal) {
+                                    PENALIDADE_SEMANA_CONSECUTIVA
+                                } else {
+                                    0
+                                };
+                            let cb = *estado.contagem_ajudante.get(&b.id).unwrap_or(&0)
+                                + if estado.designada_na_semana_anterior(b.id, semana_ordinal) {
+                                    PENALIDADE_SEMANA_CONSECUTIVA
+                                } else {
+                                    0
+                                };
+                            ca.cmp(&cb).then_with(|| sa.cmp(sb))
+                        })
+                        .map(|(a, _)| a);
                     if let Some(a) = aj {
                         usados_na_semana.insert(a.id);
                         estado.registrar_ajudante(a.id, semana_ordinal);
@@ -250,4 +316,72 @@ pub fn gerar_atribuicoes(
     }
 
     resultado
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn pessoa(id: i64, nome: &str) -> Pessoa {
+        Pessoa {
+            id,
+            nome: nome.to_string(),
+            grupo: 1,
+            surdo: false,
+            sexo: 'm',
+            publicador: true,
+            batizado: true,
+            servo: false,
+            anciao: true,
+            ativo: true,
+        }
+    }
+
+    fn parte(id: &str, semana_ordinal: i64) -> ParteParaDesignar {
+        ParteParaDesignar {
+            parte_id: id.to_string(),
+            semana_ordinal,
+            tipo: TipoParte::Presidente,
+            tem_ajudante: false,
+        }
+    }
+
+    /// Com opções sobrando, ninguém deve repetir na semana seguinte.
+    #[test]
+    fn evita_semanas_consecutivas_quando_ha_opcao() {
+        let pessoas = vec![
+            pessoa(1, "A"),
+            pessoa(2, "B"),
+            pessoa(3, "C"),
+            pessoa(4, "D"),
+        ];
+        let partes = vec![
+            parte("s1", 1),
+            parte("s2", 2),
+            parte("s3", 3),
+            parte("s4", 4),
+        ];
+
+        let resultado =
+            gerar_atribuicoes(&pessoas, &[], &partes, ConfiguracaoDesignacao::default());
+        for par in resultado.windows(2) {
+            assert_ne!(
+                par[0].pessoa_id, par[1].pessoa_id,
+                "mesma pessoa não deveria repetir em semanas consecutivas quando há opção"
+            );
+        }
+    }
+
+    /// Sem opção (só uma pessoa elegível), a repetição consecutiva deve
+    /// acontecer em vez de deixar a parte sem designado.
+    #[test]
+    fn permite_semana_consecutiva_quando_nao_ha_opcao() {
+        let pessoas = vec![pessoa(1, "Única")];
+        let partes = vec![parte("s1", 1), parte("s2", 2)];
+
+        let resultado =
+            gerar_atribuicoes(&pessoas, &[], &partes, ConfiguracaoDesignacao::default());
+        assert_eq!(resultado[0].pessoa_id, Some(1));
+        assert_eq!(resultado[1].pessoa_id, Some(1));
+    }
 }

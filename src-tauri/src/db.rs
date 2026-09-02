@@ -5,11 +5,12 @@ use tauri_plugin_sql::{Migration, MigrationKind};
 /// frontend via `Database.load("sqlite:designacoes.db")`; o Rust só define
 /// o schema aqui para manter uma única fonte de verdade versionada.
 pub fn migrations() -> Vec<Migration> {
-    vec![Migration {
-        version: 1,
-        description: "schema inicial",
-        kind: MigrationKind::Up,
-        sql: r#"
+    vec![
+        Migration {
+            version: 1,
+            description: "schema inicial",
+            kind: MigrationKind::Up,
+            sql: r#"
             CREATE TABLE config (
                 id INTEGER PRIMARY KEY CHECK (id = 1),
                 congregacao TEXT NOT NULL DEFAULT '',
@@ -75,5 +76,15 @@ pub fn migrations() -> Vec<Migration> {
             CREATE INDEX idx_designacoes_semana ON designacoes(semana_id);
             CREATE INDEX idx_designacoes_pessoa ON designacoes(pessoa_id);
         "#,
-    }]
+        },
+        Migration {
+            version: 2,
+            description: "opcoes de servos ministeriais em presidencia e estudo biblico",
+            kind: MigrationKind::Up,
+            sql: r#"
+            ALTER TABLE config ADD COLUMN usar_servos_presidencia INTEGER NOT NULL DEFAULT 1;
+            ALTER TABLE config ADD COLUMN usar_servos_estudo_biblico INTEGER NOT NULL DEFAULT 1;
+        "#,
+        },
+    ]
 }

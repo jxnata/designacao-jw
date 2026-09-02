@@ -223,13 +223,13 @@ export default function Pessoas() {
             label="Servo ministerial"
             checked={form.servo}
             disabled={form.sexo === "f"}
-            onChange={(v) => setForm({ ...form, servo: v })}
+            onChange={(v) => setForm({ ...form, servo: v, batizado: v || form.batizado })}
           />
           <Checkbox
             label="Ancião"
             checked={form.anciao}
             disabled={form.sexo === "f"}
-            onChange={(v) => setForm({ ...form, anciao: v })}
+            onChange={(v) => setForm({ ...form, anciao: v, batizado: v || form.batizado })}
           />
           <Checkbox label="Ativo" checked={form.ativo} onChange={(v) => setForm({ ...form, ativo: v })} />
         </div>

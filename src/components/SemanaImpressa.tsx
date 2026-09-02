@@ -1,11 +1,6 @@
 import { calcularHorarios } from "../lib/horarios";
+import { CORES_SECAO } from "../lib/secoes";
 import type { Config, Designacao, Parte, Pessoa, Semana, TipoParte } from "../lib/types";
-
-const CORES: Record<"tesouros" | "ministerio" | "vida_crista", string> = {
-  tesouros: "#3B696F",
-  ministerio: "#A66902",
-  vida_crista: "#96141F",
-};
 
 const TITULOS_SECAO: Record<"tesouros" | "ministerio" | "vida_crista", string> = {
   tesouros: "TESOUROS DA PALAVRA DE DEUS",
@@ -86,7 +81,7 @@ export default function SemanaImpressa({ semana, partes, designacoes, pessoasPor
     return (
       <div
         className="my-1 px-2 py-1 text-[10px] font-semibold text-white"
-        style={{ background: CORES[secao] }}
+        style={{ background: CORES_SECAO[secao].borda }}
       >
         {TITULOS_SECAO[secao]}
       </div>

@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import {
+  getConfig,
   historicoParaBalanceador,
   listarPartes,
   listarPessoas,
@@ -92,6 +93,7 @@ export async function gerarPreview(
 ): Promise<ItemPreview[]> {
   const pessoas = await listarPessoas(false);
   const historicoBruto = await historicoParaBalanceador();
+  const config = await getConfig();
   const semanaOrdinalPorId = new Map(semanas.map((s) => [s.id, s.ordinal]));
 
   const historico: DesignacaoHistorica[] = historicoBruto.map((h) => ({
@@ -101,21 +103,39 @@ export async function gerarPreview(
     como_ajudante: h.como_ajudante,
   }));
 
-  const partesParaDesignar: ParteParaDesignar[] = unidades.map((u) => ({
-    parte_id: u.parte_id,
-    semana_ordinal: semanaOrdinalPorId.get(u.semana_id) ?? 0,
-    tipo: u.tipo,
-    tem_ajudante: u.tem_ajudante,
-  }));
+  // A oração inicial não passa pelo balanceador: é sempre feita por quem
+  // preside a reunião naquela semana, então nem entra no sorteio.
+  const partesParaDesignar: ParteParaDesignar[] = unidades
+    .filter((u) => u.tipo !== "oracao_inicial")
+    .map((u) => ({
+      parte_id: u.parte_id,
+      semana_ordinal: semanaOrdinalPorId.get(u.semana_id) ?? 0,
+      tipo: u.tipo,
+      tem_ajudante: u.tem_ajudante,
+    }));
 
   const resultado = await invoke<DesignacaoResultado[]>("gerar_atribuicoes", {
     pessoas: pessoas.map(paraAssign),
     historico,
     partes: partesParaDesignar,
+    config: {
+      usar_servos_presidencia: config.usar_servos_presidencia,
+      usar_servos_estudo_biblico: config.usar_servos_estudo_biblico,
+    },
   });
 
   const porId = new Map(resultado.map((r) => [r.parte_id, r]));
+  const presidentePorSemana = new Map<number, number | null>();
+  for (const u of unidades) {
+    if (u.tipo === "presidente") {
+      presidentePorSemana.set(u.semana_id, porId.get(u.parte_id)?.pessoa_id ?? null);
+    }
+  }
+
   return unidades.map((u) => {
+    if (u.tipo === "oracao_inicial") {
+      return { ...u, pessoa_id: presidentePorSemana.get(u.semana_id) ?? null, ajudante_id: null };
+    }
     const r = porId.get(u.parte_id);
     return { ...u, pessoa_id: r?.pessoa_id ?? null, ajudante_id: r?.ajudante_id ?? null };
   });

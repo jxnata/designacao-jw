@@ -1,12 +1,12 @@
 //! Regras de elegibilidade por tipo de parte, conforme os critérios da
-//! congregação (ver plano): anciãos/servos para Tesouros/Joias/Vida Cristã,
-//! só anciãos para Necessidades Locais e partes que exigem anciãos, homens
-//! (não precisa publicador nem batizado) para a leitura, mulheres para as
-//! demonstrações de Faça Seu Melhor, homens batizados para discursos e
-//! orações, e anciãos (com servo como reforço penalizado) para presidente e
-//! estudo bíblico.
+//! congregação (ver plano): anciãos/servos para Tesouros/Joias/Vida
+//! Cristã/Consideração (ministério), só anciãos para Necessidades Locais e
+//! partes que exigem anciãos, homens (não precisa publicador nem batizado)
+//! para a leitura, mulheres para as demonstrações de Faça Seu Melhor,
+//! homens batizados para discursos e orações, e anciãos (com servo como
+//! reforço penalizado) para presidente e estudo bíblico.
 
-use super::balance::Pessoa;
+use super::balance::{ConfiguracaoDesignacao, Pessoa};
 use crate::wol::TipoParte;
 
 /// Penalidade somada à posição do candidato no ranking quando ele cobre uma
@@ -19,6 +19,14 @@ pub const PENALIDADE_REFORCO: u32 = 1_000;
 /// Penalidade aplicada quando a pessoa já cobriu o mesmo tipo de parte
 /// dentro da janela de "recência" (ver `balance::JANELA_RECENCIA_SEMANAS`).
 pub const PENALIDADE_RECENTE: u32 = 100;
+
+/// Penalidade aplicada quando a pessoa teve qualquer designação (como
+/// estudante/orador ou como ajudante) na semana imediatamente anterior.
+/// É muito maior que as demais para praticamente nunca vencer alguém livre
+/// na semana passada — mas continua sendo só uma penalidade de ranking, não
+/// uma exclusão: se ninguém mais está elegível, a pessoa ainda pode ser
+/// designada de novo em semanas consecutivas.
+pub const PENALIDADE_SEMANA_CONSECUTIVA: u32 = 10_000;
 
 pub fn homem_batizado(p: &Pessoa) -> bool {
     p.sexo == 'm' && p.batizado
@@ -33,20 +41,40 @@ pub fn anciao_ou_servo(p: &Pessoa) -> bool {
 /// informa se a designação seria um "reforço" (fora do privilégio natural,
 /// ex.: servo em uma parte de ancião) para que o balanceador some a
 /// penalidade correspondente.
-pub fn elegivel(tipo: TipoParte, p: &Pessoa) -> Option<bool /* é reforço */> {
+///
+/// `config` controla se servos ministeriais podem cobrir Presidente e
+/// Estudo Bíblico de Congregação — em algumas congregações essas partes são
+/// reservadas só a anciãos, mesmo como reforço.
+pub fn elegivel(
+    tipo: TipoParte,
+    p: &Pessoa,
+    config: &ConfiguracaoDesignacao,
+) -> Option<bool /* é reforço */> {
     if !p.ativo {
         return None;
     }
     use TipoParte::*;
     let (ok, reforco) = match tipo {
-        Presidente => (p.anciao || p.servo, !p.anciao),
+        Presidente => {
+            if config.usar_servos_presidencia {
+                (p.anciao || p.servo, !p.anciao)
+            } else {
+                (p.anciao, false)
+            }
+        }
         OracaoInicial | OracaoFinal => (homem_batizado(p), false),
-        Tesouros | Joias | VidaCrista => (anciao_ou_servo(p), false),
+        Tesouros | Joias | VidaCrista | MinisterioConsideracao => (anciao_ou_servo(p), false),
         Leitura => (p.sexo == 'm', false),
         MinisterioDemonstracao => (p.sexo == 'f', false),
         MinisterioDiscurso => (homem_batizado(p), false),
         VidaCristaAncioes | NecessidadesLocais => (p.anciao, false),
-        EstudoBiblico => (p.anciao || p.servo, !p.anciao),
+        EstudoBiblico => {
+            if config.usar_servos_estudo_biblico {
+                (p.anciao || p.servo, !p.anciao)
+            } else {
+                (p.anciao, false)
+            }
+        }
     };
     if ok {
         Some(reforco)

@@ -73,6 +73,30 @@ export default function Configuracoes() {
         />
       </label>
 
+      <div className="mb-4 space-y-2 border-t border-slate-200 pt-3">
+        <p className="text-xs font-medium text-slate-600">Designação</p>
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={config.usar_servos_presidencia}
+            onChange={(e) =>
+              setConfig({ ...config, usar_servos_presidencia: e.target.checked })
+            }
+          />
+          Usar servos ministeriais na presidência
+        </label>
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={config.usar_servos_estudo_biblico}
+            onChange={(e) =>
+              setConfig({ ...config, usar_servos_estudo_biblico: e.target.checked })
+            }
+          />
+          Usar servos ministeriais no Estudo Bíblico de Congregação
+        </label>
+      </div>
+
       <button className="rounded bg-teal-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-800">
         Salvar
       </button>

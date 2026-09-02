@@ -14,6 +14,7 @@ export type TipoParte =
   | "leitura"
   | "ministerio_discurso"
   | "ministerio_demonstracao"
+  | "ministerio_consideracao"
   | "vida_crista"
   | "vida_crista_ancioes"
   | "necessidades_locais"
@@ -28,6 +29,7 @@ export const ROTULO_TIPO: Record<TipoParte, string> = {
   leitura: "Leitura da Bíblia",
   ministerio_discurso: "Discurso (ministério)",
   ministerio_demonstracao: "Demonstração (ministério)",
+  ministerio_consideracao: "Consideração (ministério)",
   vida_crista: "Nossa Vida Cristã",
   vida_crista_ancioes: "Nossa Vida Cristã (anciãos)",
   necessidades_locais: "Necessidades locais",
@@ -55,6 +57,8 @@ export interface Config {
   dia_semana: number;
   horario: string;
   transicao_min: number;
+  usar_servos_presidencia: boolean;
+  usar_servos_estudo_biblico: boolean;
 }
 
 export interface ParteWeb {

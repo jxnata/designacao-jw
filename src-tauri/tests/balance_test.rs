@@ -1,4 +1,6 @@
-use app_lib::assign::{gerar_atribuicoes, DesignacaoHistorica, ParteParaDesignar, Pessoa};
+use app_lib::assign::{
+    gerar_atribuicoes, ConfiguracaoDesignacao, DesignacaoHistorica, ParteParaDesignar, Pessoa,
+};
 use app_lib::wol::TipoParte;
 use std::collections::HashMap;
 
@@ -76,7 +78,7 @@ fn respeita_privilegios_por_tipo_de_parte() {
         partes.extend(partes_da_semana(semana));
     }
 
-    let resultado = gerar_atribuicoes(&pessoas, &[], &partes);
+    let resultado = gerar_atribuicoes(&pessoas, &[], &partes, ConfiguracaoDesignacao::default());
     let por_id: HashMap<i64, &Pessoa> = pessoas.iter().map(|p| (p.id, p)).collect();
 
     for (parte, r) in partes.iter().zip(resultado.iter()) {
@@ -98,6 +100,9 @@ fn respeita_privilegios_por_tipo_de_parte() {
             }
             VidaCristaAncioes | NecessidadesLocais => assert!(p.anciao),
             EstudoBiblico => assert!(p.anciao || p.servo),
+            MinisterioConsideracao => {
+                assert!(p.anciao || p.servo, "consideração: ancião ou servo")
+            }
         }
 
         if parte.tem_ajudante {
@@ -120,7 +125,7 @@ fn mantem_equilibrio_apos_oito_semanas() {
         partes.extend(partes_da_semana(semana));
     }
 
-    let resultado = gerar_atribuicoes(&pessoas, &[], &partes);
+    let resultado = gerar_atribuicoes(&pessoas, &[], &partes, ConfiguracaoDesignacao::default());
 
     let mut total: HashMap<i64, u32> = HashMap::new();
     for r in &resultado {
@@ -164,7 +169,7 @@ fn mantem_equilibrio_apos_oito_semanas() {
 fn nao_designa_duas_partes_para_a_mesma_pessoa_na_mesma_semana() {
     let pessoas = congregacao_sintetica();
     let partes = partes_da_semana(0);
-    let resultado = gerar_atribuicoes(&pessoas, &[], &partes);
+    let resultado = gerar_atribuicoes(&pessoas, &[], &partes, ConfiguracaoDesignacao::default());
 
     let mut vistos = std::collections::HashSet::new();
     for r in &resultado {
@@ -226,7 +231,12 @@ fn usa_historico_para_priorizar_quem_designou_menos() {
         tem_ajudante: false,
     }];
 
-    let resultado = gerar_atribuicoes(&pessoas, &historico, &partes);
+    let resultado = gerar_atribuicoes(
+        &pessoas,
+        &historico,
+        &partes,
+        ConfiguracaoDesignacao::default(),
+    );
     assert_ne!(
         resultado[0].pessoa_id,
         Some(1),

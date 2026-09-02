@@ -29,6 +29,7 @@ pub enum TipoParte {
     Leitura,
     MinisterioDiscurso,
     MinisterioDemonstracao,
+    MinisterioConsideracao,
     VidaCrista,
     VidaCristaAncioes,
     NecessidadesLocais,
@@ -152,7 +153,12 @@ fn classificar(secao: Secao, titulo: &str, descricao: &str) -> (TipoParte, bool)
             }
         }
         Secao::Ministerio => {
-            if desc_l.contains("discurso") {
+            if titulo_l.contains("consideração") || desc_l.contains("consideração") {
+                // "Consideração" é uma parte falada com a assistência, não
+                // um exercício de dois estudantes — cabe a ancião ou servo,
+                // igual às partes de Tesouros/Vida Cristã.
+                (TipoParte::MinisterioConsideracao, false)
+            } else if titulo_l.contains("discurso") || desc_l.contains("discurso") {
                 (TipoParte::MinisterioDiscurso, false)
             } else {
                 (TipoParte::MinisterioDemonstracao, true)
@@ -165,7 +171,11 @@ fn classificar(secao: Secao, titulo: &str, descricao: &str) -> (TipoParte, bool)
                 || desc_l.contains("necessidades locais")
             {
                 (TipoParte::NecessidadesLocais, false)
-            } else if titulo_l.contains("anciã") || desc_l.contains("anciã") {
+            } else if titulo_l.contains("anciã")
+                || desc_l.contains("anciã")
+                || titulo_l.contains("superintendente")
+                || desc_l.contains("superintendente")
+            {
                 (TipoParte::VidaCristaAncioes, false)
             } else {
                 (TipoParte::VidaCrista, false)
@@ -292,4 +302,34 @@ pub fn parse_documento(doc_html: &str) -> Result<SemanaImportada, ParseError> {
         cantico_final,
         partes,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Exemplo real: "6. O que você diria? (6 min) Consideração. DE CASA EM
+    /// CASA. Faça um resumo da lição 1 ponto 4..." — não é uma demonstração
+    /// de dois estudantes, é uma parte falada por ancião/servo.
+    #[test]
+    fn classifica_consideracao_como_tipo_proprio_sem_ajudante() {
+        let (tipo, tem_ajudante) = classificar(
+            Secao::Ministerio,
+            "O que você diria?",
+            "(6 min) Consideração. DE CASA EM CASA. Faça um resumo da lição 1 ponto 4. Mostre a imagem.",
+        );
+        assert_eq!(tipo, TipoParte::MinisterioConsideracao);
+        assert!(!tem_ajudante);
+    }
+
+    #[test]
+    fn classifica_discurso_pelo_titulo_quando_nao_esta_na_descricao() {
+        let (tipo, tem_ajudante) = classificar(
+            Secao::Ministerio,
+            "Discurso",
+            "(5 min) Baseado na lição 2 da apostila Ame as Pessoas.",
+        );
+        assert_eq!(tipo, TipoParte::MinisterioDiscurso);
+        assert!(!tem_ajudante);
+    }
 }

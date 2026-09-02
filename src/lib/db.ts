@@ -22,6 +22,13 @@ function bool(v: unknown): boolean {
   return v === 1 || v === true;
 }
 
+// tauri-plugin-sql não serializa `true`/`false` como inteiro 0/1 ao fazer
+// bind de parâmetros — precisamos converter manualmente antes de gravar,
+// senão os CHECK constraints e a leitura de volta (bool() acima) quebram.
+function int(v: boolean): number {
+  return v ? 1 : 0;
+}
+
 function toPessoa(r: Record<string, unknown>): Pessoa {
   return {
     id: r.id as number,
@@ -55,13 +62,13 @@ export async function salvarPessoa(p: Omit<Pessoa, "id"> & { id?: number }): Pro
   if (p.id) {
     await db.execute(
       `UPDATE pessoas SET nome=$1, grupo=$2, surdo=$3, sexo=$4, publicador=$5, batizado=$6, servo=$7, anciao=$8, ativo=$9 WHERE id=$10`,
-      [p.nome, p.grupo, p.surdo, p.sexo, p.publicador, p.batizado, servo, anciao, p.ativo, p.id],
+      [p.nome, p.grupo, int(p.surdo), p.sexo, int(p.publicador), int(p.batizado), int(servo), int(anciao), int(p.ativo), p.id],
     );
     return p.id;
   }
   const res = await db.execute(
     `INSERT INTO pessoas (nome, grupo, surdo, sexo, publicador, batizado, servo, anciao, ativo) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-    [p.nome, p.grupo, p.surdo, p.sexo, p.publicador, p.batizado, servo, anciao, p.ativo],
+    [p.nome, p.grupo, int(p.surdo), p.sexo, int(p.publicador), int(p.batizado), int(servo), int(anciao), int(p.ativo)],
   );
   return res.lastInsertId as number;
 }
@@ -73,17 +80,36 @@ export async function excluirPessoa(id: number): Promise<void> {
 
 // ---------- Config ----------
 
+function toConfig(r: Record<string, unknown>): Config {
+  return {
+    id: r.id as number,
+    congregacao: r.congregacao as string,
+    dia_semana: r.dia_semana as number,
+    horario: r.horario as string,
+    transicao_min: r.transicao_min as number,
+    usar_servos_presidencia: bool(r.usar_servos_presidencia),
+    usar_servos_estudo_biblico: bool(r.usar_servos_estudo_biblico),
+  };
+}
+
 export async function getConfig(): Promise<Config> {
   const db = await getDb();
-  const rows = await db.select<Config[]>(`SELECT * FROM config WHERE id = 1`);
-  return rows[0];
+  const rows = await db.select<Record<string, unknown>[]>(`SELECT * FROM config WHERE id = 1`);
+  return toConfig(rows[0]);
 }
 
 export async function salvarConfig(c: Config): Promise<void> {
   const db = await getDb();
   await db.execute(
-    `UPDATE config SET congregacao=$1, dia_semana=$2, horario=$3, transicao_min=$4 WHERE id=1`,
-    [c.congregacao, c.dia_semana, c.horario, c.transicao_min],
+    `UPDATE config SET congregacao=$1, dia_semana=$2, horario=$3, transicao_min=$4, usar_servos_presidencia=$5, usar_servos_estudo_biblico=$6 WHERE id=1`,
+    [
+      c.congregacao,
+      c.dia_semana,
+      c.horario,
+      c.transicao_min,
+      int(c.usar_servos_presidencia),
+      int(c.usar_servos_estudo_biblico),
+    ],
   );
 }
 
@@ -138,7 +164,7 @@ export async function importarSemanas(semanasWeb: SemanaWeb[]): Promise<void> {
       await db.execute(
         `INSERT INTO partes (semana_id, ordem, numero, secao, titulo, duracao_min, descricao, tipo, tem_ajudante)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-        [semanaId, p.ordem, p.numero, p.secao, p.titulo, p.duracao_min, p.descricao, p.tipo, p.tem_ajudante],
+        [semanaId, p.ordem, p.numero, p.secao, p.titulo, p.duracao_min, p.descricao, p.tipo, int(p.tem_ajudante)],
       );
     }
   }
@@ -301,14 +327,21 @@ export async function importarBackup(b: BackupCompleto): Promise<void> {
     await db.execute(`DELETE FROM pessoas`);
 
     await db.execute(
-      `UPDATE config SET congregacao=$1, dia_semana=$2, horario=$3, transicao_min=$4 WHERE id=1`,
-      [b.config.congregacao, b.config.dia_semana, b.config.horario, b.config.transicao_min],
+      `UPDATE config SET congregacao=$1, dia_semana=$2, horario=$3, transicao_min=$4, usar_servos_presidencia=$5, usar_servos_estudo_biblico=$6 WHERE id=1`,
+      [
+        b.config.congregacao,
+        b.config.dia_semana,
+        b.config.horario,
+        b.config.transicao_min,
+        int(b.config.usar_servos_presidencia ?? true),
+        int(b.config.usar_servos_estudo_biblico ?? true),
+      ],
     );
 
     for (const p of b.pessoas) {
       await db.execute(
         `INSERT INTO pessoas (id, nome, grupo, surdo, sexo, publicador, batizado, servo, anciao, ativo) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-        [p.id, p.nome, p.grupo, p.surdo, p.sexo, p.publicador, p.batizado, p.servo, p.anciao, p.ativo],
+        [p.id, p.nome, p.grupo, int(p.surdo), p.sexo, int(p.publicador), int(p.batizado), int(p.servo), int(p.anciao), int(p.ativo)],
       );
     }
     for (const s of b.semanas) {
@@ -325,7 +358,7 @@ export async function importarBackup(b: BackupCompleto): Promise<void> {
       await db.execute(
         `INSERT INTO partes (id, semana_id, ordem, numero, secao, titulo, duracao_min, descricao, tipo, tem_ajudante)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-        [p.id, p.semana_id, p.ordem, p.numero, p.secao, p.titulo, p.duracao_min, p.descricao, p.tipo, p.tem_ajudante],
+        [p.id, p.semana_id, p.ordem, p.numero, p.secao, p.titulo, p.duracao_min, p.descricao, p.tipo, int(p.tem_ajudante)],
       );
     }
     for (const d of b.designacoes) {

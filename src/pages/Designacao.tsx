@@ -11,6 +11,7 @@ import {
 } from "../lib/db";
 import { gerarPreview, montarUnidades } from "../lib/designacao";
 import { ordenarParaSelect } from "../lib/regras";
+import { CORES_SECAO, SECAO_POR_TIPO } from "../lib/secoes";
 import { ROTULO_TIPO } from "../lib/types";
 import type { ItemPreview, Pessoa, Semana } from "../lib/types";
 
@@ -19,6 +20,7 @@ export default function Designacao() {
   const [pessoas, setPessoas] = useState<Pessoa[]>([]);
   const [selecionadas, setSelecionadas] = useState<Set<number>>(new Set());
   const [buscando, setBuscando] = useState(false);
+  const [adicionando, setAdicionando] = useState(false);
   const [gerandoPreview, setGerandoPreview] = useState(false);
   const [preview, setPreview] = useState<ItemPreview[] | null>(null);
   const [mostrarTodos, setMostrarTodos] = useState<Set<string>>(new Set());
@@ -45,6 +47,26 @@ export default function Designacao() {
       setErro(String(e));
     } finally {
       setBuscando(false);
+    }
+  }
+
+  async function adicionarSemana() {
+    const ultima = [...semanas].sort((a, b) => b.ordinal - a.ordinal)[0];
+    if (!ultima) return;
+    setErro(null);
+    setAdicionando(true);
+    try {
+      const semanasWeb = await invoke("importar_semanas", {
+        quantidade: 1,
+        anoApos: ultima.ano,
+        semanaIsoApos: ultima.semana_iso,
+      });
+      await importarSemanas(semanasWeb as never);
+      await recarregar();
+    } catch (e) {
+      setErro(String(e));
+    } finally {
+      setAdicionando(false);
     }
   }
 
@@ -240,6 +262,18 @@ export default function Designacao() {
           </tbody>
         </table>
       </div>
+
+      {semanas.length > 0 && (
+        <div className="mt-3">
+          <button
+            className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50"
+            onClick={adicionarSemana}
+            disabled={adicionando}
+          >
+            {adicionando ? "Adicionando…" : "Adicionar semana"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -281,8 +315,14 @@ function LinhaPreview({
         .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
     : [];
 
+  const secao = SECAO_POR_TIPO[item.tipo];
+  const cores = secao ? CORES_SECAO[secao] : null;
+
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded border border-slate-100 px-2 py-1.5">
+    <div
+      className="flex flex-wrap items-center gap-2 rounded border border-slate-100 px-2 py-1.5"
+      style={cores ? { borderLeft: `4px solid ${cores.borda}` } : undefined}
+    >
       <div className="w-56 shrink-0 text-xs text-slate-600">
         <div className="font-medium text-slate-800">{item.titulo}</div>
         <div>{ROTULO_TIPO[item.tipo]}</div>

@@ -30,6 +30,7 @@ scraper = "0.20"
 regex = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 thiserror = "1"
+rand = "0.8"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
