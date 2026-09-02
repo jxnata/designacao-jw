@@ -23,10 +23,12 @@ function somarMinutos(hhmm: string, min: number): string {
 
 /**
  * Calcula os horários de início de cada bloco da reunião, seguindo a regra
- * simplificada combinada no planejamento: cada parte soma sua duração mais
- * `transicao_min` (exceto a primeira, que emenda direto nos comentários
- * iniciais); cântico do meio, comentários finais e cântico final são blocos
- * fixos entre as seções. Congregações com transições diferentes das
+ * simplificada combinada no planejamento: cântico do meio, comentários
+ * finais e cântico final são blocos fixos entre as seções. O intervalo
+ * `transicao_min` só é somado depois da Leitura da Bíblia e depois de cada
+ * parte de Faça Seu Melhor no Ministério — as demais transições (entre as
+ * partes de Tesouros e entre as partes de Nossa Vida Cristã) emendam direto,
+ * sem esse tempo extra. Congregações com transições diferentes das
  * conferidas no modelo podem ajustar `transicao_min` na página de
  * configuração.
  */
@@ -42,11 +44,12 @@ export function calcularHorarios(config: Config, partes: Parte[]): Record<string
 
   let primeiraDaSecaoVidaCrista = true;
   partes.forEach((p, i) => {
+    const anterior = partes[i - 1];
     if (p.secao === "vida_crista" && primeiraDaSecaoVidaCrista) {
       primeiraDaSecaoVidaCrista = false;
       horarios["cantico_meio"] = t;
       t = somarMinutos(t, CANTICO_MEIO_MIN);
-    } else if (i > 0) {
+    } else if (anterior && (anterior.tipo === "leitura" || anterior.secao === "ministerio")) {
       t = somarMinutos(t, transicao);
     }
     horarios[`parte_${p.id}`] = t;
