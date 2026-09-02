@@ -10,7 +10,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 use super::rules::{
-    elegivel, elegivel_ajudante, PENALIDADE_RECENTE, PENALIDADE_REFORCO,
+    elegivel, elegivel_ajudante, PENALIDADE_MESMA_SEMANA, PENALIDADE_RECENTE, PENALIDADE_REFORCO,
     PENALIDADE_SEMANA_CONSECUTIVA,
 };
 use crate::wol::TipoParte;
@@ -234,8 +234,12 @@ fn chave(
 
 /// Gera as designações para todas as partes informadas, respeitando a ordem
 /// cronológica (`semana_ordinal`) e mantendo o equilíbrio de carga entre as
-/// pessoas elegíveis. Quando não há ninguém elegível e livre naquela semana,
-/// a parte fica com `pessoa_id: None` (sinalizada na UI) em vez de falhar.
+/// pessoas elegíveis. Repetir alguém que já tem outra parte na mesma semana
+/// é fortemente penalizado (`PENALIDADE_MESMA_SEMANA`), mas permitido como
+/// último recurso — por exemplo, em semanas com poucos anciãos disponíveis,
+/// o presidente pode acabar cobrindo também Joias Espirituais. A parte só
+/// fica com `pessoa_id: None` (sinalizada na UI) quando literalmente
+/// ninguém é elegível para o tipo, mesmo repetindo.
 pub fn gerar_atribuicoes(
     pessoas: &[Pessoa],
     historico: &[DesignacaoHistorica],
@@ -262,10 +266,14 @@ pub fn gerar_atribuicoes(
         for parte in partes_semana {
             let candidatos: Vec<(&Pessoa, u32)> = pessoas
                 .iter()
-                .filter(|p| !usados_na_semana.contains(&p.id))
                 .filter_map(|p| {
-                    elegivel(parte.tipo, p, &config)
-                        .map(|reforco| (p, if reforco { PENALIDADE_REFORCO } else { 0 }))
+                    elegivel(parte.tipo, p, &config).map(|reforco| {
+                        let mut penalidade = if reforco { PENALIDADE_REFORCO } else { 0 };
+                        if usados_na_semana.contains(&p.id) {
+                            penalidade += PENALIDADE_MESMA_SEMANA;
+                        }
+                        (p, penalidade)
+                    })
                 })
                 .collect();
 
@@ -280,7 +288,9 @@ pub fn gerar_atribuicoes(
                 if let Some(estudante) = escolhido {
                     let candidatos_aj: Vec<&Pessoa> = pessoas
                         .iter()
-                        .filter(|p| !usados_na_semana.contains(&p.id))
+                        // Ninguém pode ser o próprio ajudante da sua parte,
+                        // mesmo em último recurso.
+                        .filter(|p| p.id != estudante.id)
                         .filter(|p| elegivel_ajudante(parte.tipo, estudante.sexo, p, &config))
                         .collect();
                     let mut rng_aj = rand::thread_rng();
@@ -295,10 +305,20 @@ pub fn gerar_atribuicoes(
                                     PENALIDADE_SEMANA_CONSECUTIVA
                                 } else {
                                     0
+                                }
+                                + if usados_na_semana.contains(&a.id) {
+                                    PENALIDADE_MESMA_SEMANA
+                                } else {
+                                    0
                                 };
                             let cb = *estado.contagem_ajudante.get(&b.id).unwrap_or(&0)
                                 + if estado.designada_na_semana_anterior(b.id, semana_ordinal) {
                                     PENALIDADE_SEMANA_CONSECUTIVA
+                                } else {
+                                    0
+                                }
+                                + if usados_na_semana.contains(&b.id) {
+                                    PENALIDADE_MESMA_SEMANA
                                 } else {
                                     0
                                 };

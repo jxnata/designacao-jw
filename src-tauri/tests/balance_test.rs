@@ -188,6 +188,62 @@ fn nao_designa_duas_partes_para_a_mesma_pessoa_na_mesma_semana() {
     }
 }
 
+/// Regressão: congregação com só 2 anciãos e nenhum servo. Numa mesma
+/// semana com Presidente, Necessidades Locais, Vida Cristã dos Anciãos e
+/// Estudo Bíblico (todas exigindo ancião), o pool de 2 pessoas se esgota
+/// antes do Estudo Bíblico — antes da correção, ele ficava sem designado em
+/// vez de repetir alguém já usado na semana.
+#[test]
+fn nao_deixa_estudo_biblico_sem_designado_quando_pool_de_anciaos_esgota() {
+    let pessoas = vec![
+        pessoa(1, "Anciao1", 'm', true, false, true),
+        pessoa(2, "Anciao2", 'm', true, false, true),
+        pessoa(3, "Homem1", 'm', false, false, true),
+        pessoa(4, "Mulher1", 'f', false, false, true),
+    ];
+    let partes = vec![
+        ParteParaDesignar {
+            parte_id: "0-presidente".into(),
+            semana_ordinal: 0,
+            tipo: TipoParte::Presidente,
+            tem_ajudante: false,
+        },
+        ParteParaDesignar {
+            parte_id: "0-necessidades".into(),
+            semana_ordinal: 0,
+            tipo: TipoParte::NecessidadesLocais,
+            tem_ajudante: false,
+        },
+        ParteParaDesignar {
+            parte_id: "0-vidacrista-anciaos".into(),
+            semana_ordinal: 0,
+            tipo: TipoParte::VidaCristaAncioes,
+            tem_ajudante: false,
+        },
+        ParteParaDesignar {
+            parte_id: "0-estudo".into(),
+            semana_ordinal: 0,
+            tipo: TipoParte::EstudoBiblico,
+            tem_ajudante: false,
+        },
+    ];
+
+    let config = ConfiguracaoDesignacao {
+        usar_servos_estudo_biblico: false,
+        ..ConfiguracaoDesignacao::default()
+    };
+    let resultado = gerar_atribuicoes(&pessoas, &[], &partes, config);
+
+    let estudo = resultado
+        .iter()
+        .find(|r| r.parte_id == "0-estudo")
+        .unwrap();
+    assert!(
+        estudo.pessoa_id.is_some(),
+        "Estudo Bíblico não deveria ficar sem designado quando ainda há ancião elegível, mesmo repetindo"
+    );
+}
+
 #[test]
 fn usa_historico_para_priorizar_quem_designou_menos() {
     let pessoas = congregacao_sintetica();

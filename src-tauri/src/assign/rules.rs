@@ -28,6 +28,16 @@ pub const PENALIDADE_RECENTE: u32 = 100;
 /// designada de novo em semanas consecutivas.
 pub const PENALIDADE_SEMANA_CONSECUTIVA: u32 = 10_000;
 
+/// Penalidade aplicada quando a pessoa já recebeu outra parte (principal ou
+/// como ajudante) na mesma semana. É a maior de todas — maior até que
+/// `PENALIDADE_SEMANA_CONSECUTIVA` — porque acumular duas partes na mesma
+/// reunião deve ser sempre o último recurso, só usado quando o pool de
+/// elegíveis daquele tipo se esgota naquela semana (ex.: congregação com
+/// poucos anciãos e várias partes que exigem ancião na mesma semana). Assim
+/// como as demais penalidades, não é uma exclusão: sem ela, a parte ficaria
+/// sem ninguém designado em vez de repetir alguém.
+pub const PENALIDADE_MESMA_SEMANA: u32 = 100_000;
+
 pub fn homem_batizado(p: &Pessoa) -> bool {
     p.sexo == 'm' && p.batizado
 }
