@@ -99,6 +99,16 @@ export default function Designacao() {
     setPreview((p) => (p ? p.map((i) => (i.parte_id === parteId ? { ...i, [campo]: valor } : i)) : p));
   }
 
+  function inverterAjudante(parteId: string) {
+    setPreview((p) =>
+      p
+        ? p.map((i) =>
+            i.parte_id === parteId ? { ...i, pessoa_id: i.ajudante_id, ajudante_id: i.pessoa_id } : i,
+          )
+        : p,
+    );
+  }
+
   async function confirmarEGerar() {
     if (!preview) return;
     const semanaIds = [...new Set(preview.map((i) => i.semana_id))];
@@ -186,6 +196,7 @@ export default function Designacao() {
                         })
                       }
                       onChange={(campo, valor) => atualizarItem(item.parte_id, campo, valor)}
+                      onInverterAjudante={() => inverterAjudante(item.parte_id)}
                     />
                   ))}
                 </div>
@@ -214,7 +225,7 @@ export default function Designacao() {
             onClick={gerarPreviewClick}
             disabled={selecionadas.size === 0 || gerandoPreview}
           >
-            {gerandoPreview ? "Gerando…" : "Gerar preview"}
+            {gerandoPreview ? "Gerando…" : "Gerar Designações"}
           </button>
         </div>
       </div>
@@ -310,6 +321,7 @@ function LinhaPreview({
   mostrarTodos,
   onToggleMostrarTodos,
   onChange,
+  onInverterAjudante,
 }: {
   item: ItemPreview;
   pessoas: Pessoa[];
@@ -318,6 +330,7 @@ function LinhaPreview({
   mostrarTodos: boolean;
   onToggleMostrarTodos: () => void;
   onChange: (campo: "pessoa_id" | "ajudante_id", valor: number | null) => void;
+  onInverterAjudante: () => void;
 }) {
   const opcoes = mostrarTodos ? [...pessoas].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")) : ordenarParaSelect(item.tipo, pessoas);
   const pessoaEscolhida = item.pessoa_id ? pessoasPorId.get(item.pessoa_id) : null;
@@ -354,6 +367,23 @@ function LinhaPreview({
           </option>
         ))}
       </select>
+
+      {item.tem_ajudante && (
+        <button
+          type="button"
+          className="shrink-0 rounded border border-slate-300 p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+          onClick={onInverterAjudante}
+          disabled={!item.pessoa_id && !item.ajudante_id}
+          title="Inverter designado e ajudante"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-4">
+            <path d="M17 3l4 4-4 4" />
+            <path d="M3 7h18" />
+            <path d="M7 21l-4-4 4-4" />
+            <path d="M21 17H3" />
+          </svg>
+        </button>
+      )}
 
       {item.tem_ajudante && (
         <select
