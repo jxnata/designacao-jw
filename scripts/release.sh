@@ -96,8 +96,14 @@ tmp="$(mktemp)"
 jq --arg v "$new_version" '.version = $v' "$TAURI_CONF" >"$tmp" && mv "$tmp" "$TAURI_CONF"
 
 echo "Atualizando $CARGO_TOML..."
-sed -i.bak -E "0,/^version = \".*\"/s//version = \"$new_version\"/" "$CARGO_TOML"
-rm -f "${CARGO_TOML}.bak"
+# Só a primeira ocorrência de `version = "..."` (a do [package]) — as demais
+# são de dependências. `sed -i` com endereço `0,/regex/` é GNU-only e falha
+# silenciosamente no BSD sed do macOS, então usamos awk (portável).
+tmp="$(mktemp)"
+awk -v v="$new_version" '
+  !done && /^version = "/ { sub(/^version = ".*"/, "version = \"" v "\""); done=1 }
+  { print }
+' "$CARGO_TOML" >"$tmp" && mv "$tmp" "$CARGO_TOML"
 
 if command -v cargo >/dev/null 2>&1; then
   echo "Atualizando $CARGO_LOCK..."
@@ -113,7 +119,11 @@ npm install --package-lock-only --silent
 
 echo "Commitando alterações de versão..."
 git add "$PACKAGE_JSON" package-lock.json "$TAURI_CONF" "$CARGO_TOML" "$CARGO_LOCK"
-git commit -m "Bump de versão para $new_version"
+if git diff --cached --quiet; then
+  echo "Nada para commitar (manifestos já estavam em $new_version) — seguindo direto para a tag."
+else
+  git commit -m "Bump de versão para $new_version"
+fi
 
 echo "Criando tag $tag..."
 git tag -a "$tag" -m "Release $new_version"
