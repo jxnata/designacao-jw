@@ -116,7 +116,7 @@ export default function SemanaImpressa({ semana, partes, designacoes, pessoasPor
             {porSala.map(({ sala, d: dSala }) => (
               <div key={sala} className="whitespace-nowrap">
                 <span className="text-[9px] text-slate-500">{ROTULO_SALA[sala]}: </span>
-                <span className="font-medium">{nome(dSala, { abreviar: true })}</span>
+                <span className="font-medium">{nome(dSala, { abreviar: !!dSala?.ajudante_id })}</span>
               </div>
             ))}
           </div>
