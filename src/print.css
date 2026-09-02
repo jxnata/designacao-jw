@@ -4,7 +4,35 @@
     margin: 10mm;
   }
   html,
-  body {
+  body,
+  #root,
+  #root > div {
     background: white !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .folha-impressa {
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+
+  /* Nunca quebrar a página no meio de uma semana. */
+  .semana-impressa {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    orphans: 3;
+    widows: 3;
+  }
+
+  /* Nem no meio de uma única linha de designação, caso a semana já ultrapasse uma página. */
+  .linha-impressa {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .barra-secao {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 }

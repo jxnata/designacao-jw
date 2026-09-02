@@ -40,7 +40,14 @@ export default function Impressao() {
 
   if (!config || !dados) return <p className="text-sm text-slate-500">Carregando…</p>;
 
-  const hoje = new Date().toLocaleDateString("pt-BR");
+  async function imprimir() {
+    try {
+      await window.print();
+    } catch (erro) {
+      console.error("Falha ao abrir a impressão", erro);
+      alert("Não foi possível abrir a impressão. Verifique o console para detalhes.");
+    }
+  }
 
   return (
     <div>
@@ -48,7 +55,7 @@ export default function Impressao() {
         <h1 className="text-lg font-semibold">Programação impressa</h1>
         <button
           className="rounded bg-teal-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-800"
-          onClick={() => window.print()}
+          onClick={imprimir}
         >
           Imprimir / salvar PDF
         </button>
@@ -60,15 +67,7 @@ export default function Impressao() {
         </p>
       )}
 
-      <div className="mx-auto max-w-3xl bg-white p-4 shadow-sm">
-        <div className="mb-3 flex items-baseline justify-between border-b-2 border-slate-700 pb-2">
-          <div>
-            <div className="text-lg font-semibold">Programação da reunião do meio de semana</div>
-            <div className="text-sm text-slate-600">{config.congregacao}</div>
-          </div>
-          <div className="text-xs text-slate-500">Impresso - {hoje}</div>
-        </div>
-
+      <div className="folha-impressa mx-auto max-w-3xl bg-white p-4 shadow-sm">
         {dados.map(({ semana, partes, designacoes }) => (
           <SemanaImpressa
             key={semana.id}

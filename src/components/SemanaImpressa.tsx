@@ -12,10 +12,6 @@ const TITULOS_SECAO: Record<"tesouros" | "ministerio" | "vida_crista", string> =
  * partes de discurso (talks) não levam rótulo, só o nome. */
 function rotuloPapel(tipo: TipoParte): string | null {
   switch (tipo) {
-    case "leitura":
-      return "Estudante:";
-    case "ministerio_demonstracao":
-      return "Estudante/Ajudante:";
     case "estudo_biblico":
       return "Dirigente:";
     case "oracao_inicial":
@@ -24,6 +20,11 @@ function rotuloPapel(tipo: TipoParte): string | null {
     default:
       return null;
   }
+}
+
+/** "Oração:" e "Dirigente:" ficam na mesma linha do nome; os demais rótulos quebram linha. */
+function rotuloEmLinha(tipo: TipoParte): boolean {
+  return tipo === "oracao_inicial" || tipo === "oracao_final" || tipo === "estudo_biblico";
 }
 
 interface Props {
@@ -63,16 +64,24 @@ export default function SemanaImpressa({ semana, partes, designacoes, pessoasPor
   function Linha({ parte }: { parte: Parte }) {
     const d = porTipo.get(`parte:${parte.id}`);
     const rotulo = rotuloPapel(parte.tipo);
+    const emLinha = rotuloEmLinha(parte.tipo);
     return (
-      <div className="grid grid-cols-[46px_1fr_200px] items-start gap-2 py-[3px] text-[10.5px] leading-tight">
+      <div className="linha-impressa grid grid-cols-[46px_1fr_200px] items-start gap-2 py-[3px] text-[10.5px] leading-tight">
         <div className="pt-0.5 text-slate-500">{horarios[`parte_${parte.id}`]}</div>
         <div>
           {parte.numero}. {parte.titulo} ({parte.duracao_min} min.)
         </div>
-        <div>
-          {rotulo && <div className="text-[9px] text-slate-500">{rotulo}</div>}
-          <div className="font-medium">{nome(d)}</div>
-        </div>
+        {emLinha ? (
+          <div>
+            {rotulo && <span className="text-[9px] text-slate-500">{rotulo} </span>}
+            <span className="font-medium">{nome(d)}</span>
+          </div>
+        ) : (
+          <div>
+            {rotulo && <div className="text-[9px] text-slate-500">{rotulo}</div>}
+            <div className="font-medium">{nome(d)}</div>
+          </div>
+        )}
       </div>
     );
   }
@@ -80,7 +89,7 @@ export default function SemanaImpressa({ semana, partes, designacoes, pessoasPor
   function BarraSecao({ secao }: { secao: "tesouros" | "ministerio" | "vida_crista" }) {
     return (
       <div
-        className="my-1 px-2 py-1 text-[10px] font-semibold text-white"
+        className="barra-secao linha-impressa my-1 px-2 py-1 text-[10px] font-semibold text-white"
         style={{ background: CORES_SECAO[secao].borda }}
       >
         {TITULOS_SECAO[secao]}
@@ -89,7 +98,7 @@ export default function SemanaImpressa({ semana, partes, designacoes, pessoasPor
   }
 
   return (
-    <div className="mb-6 break-inside-avoid rounded border border-slate-200 p-3">
+    <div className="semana-impressa mb-6 rounded border border-slate-200 p-3">
       <div className="mb-1 flex items-baseline justify-between border-b border-slate-300 pb-1">
         <div className="text-sm font-semibold">
           {semana.intervalo_texto} | {semana.leitura_semanal}
@@ -100,15 +109,15 @@ export default function SemanaImpressa({ semana, partes, designacoes, pessoasPor
         </div>
       </div>
 
-      <div className="grid grid-cols-[46px_1fr_200px] items-start gap-2 py-[3px] text-[10.5px]">
+      <div className="linha-impressa grid grid-cols-[46px_1fr_200px] items-start gap-2 py-[3px] text-[10.5px]">
         <div className="text-slate-500">{horarios["cantico_inicial"]}</div>
         <div>Cântico {semana.cantico_inicial}</div>
         <div>
-          <div className="text-[9px] text-slate-500">Oração:</div>
-          <div className="font-medium">{nome(oracaoInicial)}</div>
+          <span className="text-[9px] text-slate-500">Oração: </span>
+          <span className="font-medium">{nome(oracaoInicial)}</span>
         </div>
       </div>
-      <div className="grid grid-cols-[46px_1fr_200px] items-start gap-2 py-[3px] text-[10.5px]">
+      <div className="linha-impressa grid grid-cols-[46px_1fr_200px] items-start gap-2 py-[3px] text-[10.5px]">
         <div className="text-slate-500">{horarios["comentarios_iniciais"]}</div>
         <div>Comentários iniciais (1 min)</div>
         <div className="text-[9px] text-slate-500">Salão principal</div>
@@ -124,7 +133,7 @@ export default function SemanaImpressa({ semana, partes, designacoes, pessoasPor
         <Linha key={p.id} parte={p} />
       ))}
 
-      <div className="grid grid-cols-[46px_1fr_200px] items-start gap-2 py-[3px] text-[10.5px]">
+      <div className="linha-impressa grid grid-cols-[46px_1fr_200px] items-start gap-2 py-[3px] text-[10.5px]">
         <div className="text-slate-500">{horarios["cantico_meio"]}</div>
         <div>Cântico {semana.cantico_meio}</div>
         <div />
@@ -135,17 +144,17 @@ export default function SemanaImpressa({ semana, partes, designacoes, pessoasPor
         <Linha key={p.id} parte={p} />
       ))}
 
-      <div className="grid grid-cols-[46px_1fr_200px] items-start gap-2 border-t border-slate-200 py-[3px] pt-1 text-[10.5px]">
+      <div className="linha-impressa grid grid-cols-[46px_1fr_200px] items-start gap-2 border-t border-slate-200 py-[3px] pt-1 text-[10.5px]">
         <div className="text-slate-500">{horarios["comentarios_finais"]}</div>
         <div>Comentários finais (3 min)</div>
         <div />
       </div>
-      <div className="grid grid-cols-[46px_1fr_200px] items-start gap-2 py-[3px] text-[10.5px]">
+      <div className="linha-impressa grid grid-cols-[46px_1fr_200px] items-start gap-2 py-[3px] text-[10.5px]">
         <div className="text-slate-500">{horarios["cantico_final"]}</div>
         <div>Cântico {semana.cantico_final}</div>
         <div>
-          <div className="text-[9px] text-slate-500">Oração:</div>
-          <div className="font-medium">{nome(oracaoFinal)}</div>
+          <span className="text-[9px] text-slate-500">Oração: </span>
+          <span className="font-medium">{nome(oracaoFinal)}</span>
         </div>
       </div>
     </div>
