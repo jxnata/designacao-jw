@@ -3,6 +3,27 @@
 version = 4
 
 [[package]]
+name = "Designações-JW"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "rand 0.8.8",
+ "regex",
+ "reqwest 0.12.28",
+ "scraper",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-fs",
+ "tauri-plugin-opener",
+ "tauri-plugin-sql",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -875,27 +896,6 @@ dependencies = [
  "quote",
  "rustc_version",
  "syn 2.0.119",
-]
-
-[[package]]
-name = "designacao-jw"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "rand 0.8.8",
- "regex",
- "reqwest 0.12.28",
- "scraper",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-fs",
- "tauri-plugin-opener",
- "tauri-plugin-sql",
- "thiserror 1.0.69",
- "tokio",
 ]
 
 [[package]]
