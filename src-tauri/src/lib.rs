@@ -17,6 +17,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::importar_semanas,
             commands::gerar_atribuicoes,
+            commands::salvar_arquivos,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
