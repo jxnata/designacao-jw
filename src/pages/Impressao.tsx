@@ -90,14 +90,14 @@ export default function Impressao() {
         const nomeArquivo = `${semana.ano}-S${String(semana.semana_iso).padStart(2, "0")}-p${numero}-${slug(dadosFormulario.nome)}.pdf`;
 
         arquivos.push({
-          caminho_relativo: nomeArquivo,
+          caminho_relativo: `S-89/${nomeArquivo}`,
           bytes: Array.from(bytes),
         });
         setGerando({ atual: i + 1, total: itens.length });
       }
 
       const gravados = await invoke<number>("salvar_arquivos", { pasta, arquivos });
-      setMensagem(`${gravados} S-89 salvo(s) em ${pasta}`);
+      setMensagem(`${gravados} S-89 salvo(s) em ${pasta}/S-89`);
       await revealItemInDir(pasta).catch(() => {});
     } catch (e) {
       console.error("Falha ao gerar os S-89", e);
