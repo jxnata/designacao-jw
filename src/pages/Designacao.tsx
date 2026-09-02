@@ -467,7 +467,7 @@ function StatusBadge({ status }: { status: Semana["status"] }) {
     final: "bg-emerald-50 text-emerald-700",
   };
   const rotulos: Record<Semana["status"], string> = {
-    importada: "Importada",
+    importada: "Sem designações",
     preview: "Em preview",
     final: "Designações feitas",
   };
