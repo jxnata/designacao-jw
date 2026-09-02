@@ -1,3 +1,4 @@
+import { confirm } from "@tauri-apps/plugin-dialog";
 import { useEffect, useState } from "react";
 import { excluirPessoa, listarPessoas, salvarPessoa } from "../lib/db";
 import type { Pessoa } from "../lib/types";
@@ -58,9 +59,13 @@ export default function Pessoas() {
     }
   }
 
-  async function excluir(id: number) {
-    if (!confirm("Excluir esta pessoa? O histórico de designações dela será perdido.")) return;
-    await excluirPessoa(id);
+  async function excluir(p: Pessoa) {
+    const ok = await confirm(
+      `Excluir ${p.nome}? O histórico de designações dela será perdido.`,
+      { title: "Excluir pessoa", kind: "warning" },
+    );
+    if (!ok) return;
+    await excluirPessoa(p.id);
     await recarregar();
   }
 
@@ -131,7 +136,7 @@ export default function Pessoas() {
                       </button>
                       <button
                         className="ml-3 text-xs text-red-600 hover:underline"
-                        onClick={() => excluir(p.id)}
+                        onClick={() => excluir(p)}
                       >
                         Excluir
                       </button>
