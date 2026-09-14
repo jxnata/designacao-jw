@@ -1,3 +1,13 @@
+# Changelog
+
+Toda alteração de comportamento — nova funcionalidade, correção de bug,
+remoção, mudança visível de UI/copy — deve ser registrada em
+`CHANGELOG.md`, na seção `[Não lançado]`, no mesmo commit que faz a
+mudança. Siga o formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/)
+já usado no arquivo (`Adicionado`/`Alterado`/`Removido`/`Corrigido`), em
+pt-BR. `scripts/release.sh` fecha essa seção ao criar a versão — nunca
+edite o cabeçalho de versão do `CHANGELOG.md` à mão.
+
 # Release
 
 Para qualquer bump de versão + release, use sempre `scripts/release.sh` —

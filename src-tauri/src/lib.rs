@@ -1,7 +1,7 @@
 pub mod assign;
 mod commands;
 mod db;
-pub mod wol;
+pub mod tipos;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -15,7 +15,6 @@ pub fn run() {
                 .build(),
         )
         .invoke_handler(tauri::generate_handler![
-            commands::importar_semanas,
             commands::gerar_atribuicoes,
             commands::salvar_arquivos,
         ])

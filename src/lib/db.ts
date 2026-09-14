@@ -143,16 +143,29 @@ export async function proximoOrdinal(): Promise<number> {
   return (rows[0]?.m ?? -1) + 1;
 }
 
-/** Grava as semanas baixadas do wol.jw.org (idempotente por doc_id). */
-export async function importarSemanas(semanasWeb: SemanaWeb[]): Promise<void> {
+/** Grava as semanas interpretadas do PDF da apostila (ver `src/lib/mwb/`),
+ * idempotente por (ano, semana_iso) — semanas importadas antes pelo antigo
+ * scraping (removido; ver CHANGELOG) têm `doc_id` numérico em vez do
+ * `mwb:<ano>-<semana>` que o parser de PDF gera agora, então a
+ * deduplicação não pode mais se basear nesse campo. Devolve quantas
+ * semanas foram gravadas e quantas já existiam, para a tela de
+ * importação mostrar um resumo. */
+export async function importarSemanas(
+  semanasWeb: SemanaWeb[],
+): Promise<{ importadas: number; ignoradas: number }> {
   const db = await getDb();
   let ordinal = await proximoOrdinal();
+  let importadas = 0;
+  let ignoradas = 0;
   for (const s of semanasWeb) {
     const existente = await db.select<{ id: number }[]>(
-      `SELECT id FROM semanas WHERE doc_id = $1`,
-      [s.doc_id],
+      `SELECT id FROM semanas WHERE ano = $1 AND semana_iso = $2`,
+      [s.ano, s.semana_iso],
     );
-    if (existente.length > 0) continue;
+    if (existente.length > 0) {
+      ignoradas += 1;
+      continue;
+    }
 
     const res = await db.execute(
       `INSERT INTO semanas (ordinal, ano, semana_iso, doc_id, intervalo_texto, leitura_semanal, cantico_inicial, cantico_meio, cantico_final, status)
@@ -179,7 +192,9 @@ export async function importarSemanas(semanasWeb: SemanaWeb[]): Promise<void> {
         [semanaId, p.ordem, p.numero, p.secao, p.titulo, p.duracao_min, p.descricao, p.tipo, int(p.tem_ajudante)],
       );
     }
+    importadas += 1;
   }
+  return { importadas, ignoradas };
 }
 
 export async function listarPartes(semanaId: number): Promise<Parte[]> {

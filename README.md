@@ -1,11 +1,17 @@
 # Designações — Vida e Ministério
 
 App desktop offline (Tauri v2 + React + SQLite) para montar a programação de
-designações da reunião Vida e Ministério: busca a programação das próximas 8
-semanas em wol.jw.org, distribui as partes entre a congregação respeitando os
-critérios (anciãos/servos, homens, mulheres, batizados) e mantendo o número de
+designações da reunião Vida e Ministério: você importa a apostila (mwb)
+baixada direto do jw.org — em `.jwpub` (o mesmo arquivo do JW Library,
+formato recomendado) ou em PDF —, o app lê a programação das semanas a partir
+dela, distribui as partes entre a congregação respeitando os critérios
+(anciãos/servos, homens, mulheres, batizados) e mantendo o número de
 designações equilibrado entre as pessoas, mostra um preview editável antes de
 gravar, e gera uma página imprimível no layout do modelo em PDF.
+
+O app nunca acessa a internet para buscar conteúdo da reunião — toda a
+importação acontece a partir do arquivo que você baixa manualmente, em
+conformidade com os termos de uso do jw.org.
 
 ## Rodando em desenvolvimento
 
@@ -18,17 +24,23 @@ npm install
 npm run tauri dev
 ```
 
+O `postinstall` do `npm install` copia o binário WASM do `sql.js` (usado
+para ler o `.jwpub`) para `public/sql-wasm.wasm` — se ele faltar (ex.: um
+`npm ci --ignore-scripts`), rode `node scripts/copiar-wasm.mjs` manualmente
+ou `npm run build`, que também o garante via `prebuild`.
+
 ## Testes
 
 ```bash
 cd src-tauri
-cargo test      # parser do wol.jw.org + balanceador de designações
+cargo test      # balanceador de designações
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
 
 ```bash
 npm run build    # tsc + build do frontend
+npm run test     # parsers da apostila (.jwpub e PDF) e demais testes do frontend
 ```
 
 ## Build / releases
@@ -52,10 +64,14 @@ sistemas. Como o app não é assinado digitalmente:
 
 ## Estrutura
 
-- `src-tauri/src/wol/` — busca e interpreta a programação semanal em
-  wol.jw.org (HTML → estrutura de partes).
+- `src/lib/mwb/` — lê a apostila (mwb) importada pelo usuário e monta a
+  estrutura de partes da semana, em dois formatos: `.jwpub`
+  (`jwpub.ts`/`jwpub-mapear.ts`, via
+  [`meeting-schedules-parser`](https://github.com/sws2apps/meeting-schedules-parser))
+  e PDF (`extrair.ts`/`parse.ts`, texto → recomposição de colunas e acentos
+  → partes). `index.ts` decide o parser pela extensão do arquivo.
 - `src-tauri/src/assign/` — regras de elegibilidade por tipo de parte e o
   algoritmo de designação balanceada.
 - `src-tauri/src/db.rs` — schema/migrations do SQLite.
-- `src/pages/` — Pessoas, Designação (preview + confirmação), Histórico,
-  Backup, Configurações e a página de impressão.
+- `src/pages/` — Pessoas, Designação (importação, preview + confirmação),
+  Histórico, Backup, Configurações e a página de impressão.

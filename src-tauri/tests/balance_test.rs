@@ -1,7 +1,7 @@
 use app_lib::assign::{
     gerar_atribuicoes, ConfiguracaoDesignacao, DesignacaoHistorica, ParteParaDesignar, Pessoa,
 };
-use app_lib::wol::TipoParte;
+use app_lib::tipos::TipoParte;
 use std::collections::HashMap;
 
 fn pessoa(id: i64, nome: &str, sexo: char, anciao: bool, servo: bool, batizado: bool) -> Pessoa {
@@ -234,10 +234,7 @@ fn nao_deixa_estudo_biblico_sem_designado_quando_pool_de_anciaos_esgota() {
     };
     let resultado = gerar_atribuicoes(&pessoas, &[], &partes, config);
 
-    let estudo = resultado
-        .iter()
-        .find(|r| r.parte_id == "0-estudo")
-        .unwrap();
+    let estudo = resultado.iter().find(|r| r.parte_id == "0-estudo").unwrap();
     assert!(
         estudo.pessoa_id.is_some(),
         "Estudo Bíblico não deveria ficar sem designado quando ainda há ancião elegível, mesmo repetindo"

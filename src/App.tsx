@@ -2,6 +2,7 @@ import { CalendarCheck, Database, History, Settings, Users } from "lucide-react"
 import { HashRouter, NavLink, Navigate, Route, Routes } from "react-router-dom";
 import Pessoas from "./pages/Pessoas";
 import Designacao from "./pages/Designacao";
+import ImportarSemanas from "./pages/ImportarSemanas";
 import Impressao from "./pages/Impressao";
 import Historico from "./pages/Historico";
 import Backup from "./pages/Backup";
@@ -44,6 +45,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Navigate to="/designacao" replace />} />
             <Route path="/designacao" element={<Designacao />} />
+            <Route path="/designacao/importar" element={<ImportarSemanas />} />
             <Route path="/pessoas" element={<Pessoas />} />
             <Route path="/historico" element={<Historico />} />
             <Route path="/backup" element={<Backup />} />

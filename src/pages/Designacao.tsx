@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import { confirm } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -8,7 +7,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  Download,
+  CloudUpload,
   Eraser,
   Eye,
   EyeOff,
@@ -24,7 +23,6 @@ import {
   atualizarStatusSemana,
   excluirSemana,
   getConfig,
-  importarSemanas,
   limparDesignacoesSemana,
   listarPessoas,
   listarSemanas,
@@ -49,8 +47,6 @@ export default function Designacao() {
   const [pessoas, setPessoas] = useState<Pessoa[]>([]);
   const [config, setConfig] = useState<Config | null>(null);
   const [selecionadas, setSelecionadas] = useState<Set<number>>(new Set());
-  const [adicionando, setAdicionando] = useState(false);
-  const [quantidade, setQuantidade] = useState(1);
   const [gerandoPreview, setGerandoPreview] = useState(false);
   const [preview, setPreview] = useState<ItemPreview[] | null>(null);
   const [modoPreview, setModoPreview] = useState<"gerar" | "editar">("gerar");
@@ -88,31 +84,6 @@ export default function Designacao() {
   useEffect(() => {
     if (pagina > totalPaginas) setPagina(totalPaginas);
   }, [pagina, totalPaginas]);
-
-  async function buscarSemanas() {
-    const ok = await confirm(
-      `Isso vai buscar ${quantidade === 1 ? "a próxima semana" : `as próximas ${quantidade} semanas`} diretamente do jw.org. Pode levar alguns instantes. Continuar?`,
-      { title: "Carregar semanas", kind: "info" },
-    );
-    if (!ok) return;
-    const ultima = [...semanas].sort((a, b) => b.ordinal - a.ordinal)[0];
-    setErro(null);
-    setAdicionando(true);
-    try {
-      const semanasWeb = await invoke("importar_semanas", {
-        quantidade,
-        anoApos: ultima?.ano ?? null,
-        semanaIsoApos: ultima?.semana_iso ?? null,
-      });
-      await importarSemanas(semanasWeb as never);
-      await recarregar();
-      setPagina(1);
-    } catch (e) {
-      setErro(String(e));
-    } finally {
-      setAdicionando(false);
-    }
-  }
 
   function temDesignacao(s: Semana) {
     return s.status === "final";
@@ -542,7 +513,7 @@ export default function Designacao() {
             {semanas.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-3 py-6 text-center text-slate-400">
-                  Nenhuma semana importada ainda. Use o controle abaixo para carregar.
+                  Nenhuma semana importada ainda. Use o botão "Adicionar Semanas" abaixo.
                 </td>
               </tr>
             )}
@@ -551,39 +522,13 @@ export default function Designacao() {
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-slate-600">Adicionar</span>
-          <input
-            type="number"
-            min={1}
-            max={8}
-            value={quantidade}
-            onChange={(e) => {
-              const valor = Number(e.target.value);
-              setQuantidade(Math.min(8, Math.max(1, Number.isNaN(valor) ? 1 : valor)));
-            }}
-            disabled={adicionando}
-            className="w-16 rounded border border-slate-300 px-2 py-1.5 text-sm disabled:opacity-50"
-          />
-          <span className="text-sm text-slate-600">semanas</span>
-          <button
-            className="inline-flex items-center gap-1.5 rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50"
-            onClick={buscarSemanas}
-            disabled={adicionando}
-          >
-            {adicionando ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                Carregando…
-              </>
-            ) : (
-              <>
-                <Download className="size-4" />
-                Carregar
-              </>
-            )}
-          </button>
-        </div>
+        <button
+          className="inline-flex items-center gap-1.5 rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100"
+          onClick={() => navigate("/designacao/importar")}
+        >
+          <CloudUpload className="size-4" />
+          Adicionar Semanas
+        </button>
 
         {totalPaginas > 1 && (
           <div className="flex items-center gap-2">

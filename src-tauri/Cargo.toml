@@ -25,11 +25,6 @@ tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
-scraper = "0.20"
-regex = "1"
-chrono = { version = "0.4", default-features = false, features = ["clock"] }
-thiserror = "1"
 rand = "0.8"
 
 [dev-dependencies]
