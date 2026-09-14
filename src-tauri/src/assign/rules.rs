@@ -7,7 +7,7 @@
 //! reforço penalizado) para presidente e estudo bíblico.
 
 use super::balance::{ConfiguracaoDesignacao, Pessoa};
-use crate::wol::TipoParte;
+use crate::tipos::TipoParte;
 
 /// Penalidade somada à posição do candidato no ranking quando ele cobre uma
 /// parte "acima" do seu privilégio natural (ex.: servo presidindo ou

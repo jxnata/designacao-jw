@@ -13,7 +13,7 @@ use super::rules::{
     elegivel, elegivel_ajudante, PENALIDADE_MESMA_SEMANA, PENALIDADE_RECENTE, PENALIDADE_REFORCO,
     PENALIDADE_SEMANA_CONSECUTIVA,
 };
-use crate::wol::TipoParte;
+use crate::tipos::TipoParte;
 
 /// Quantas semanas (ordinais) contam como "recente" para penalizar repetir
 /// o mesmo tipo de parte.

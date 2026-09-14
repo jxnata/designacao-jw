@@ -85,7 +85,9 @@ export interface ParteWeb {
   tem_ajudante: boolean;
 }
 
-/** Retorno bruto de `importar_semanas` — ainda não gravado no banco. */
+/** Retorno bruto do parser da apostila em PDF (`src/lib/mwb/`) — ainda não
+ * gravado no banco. Mesmo formato que o antigo comando `importar_semanas`
+ * (scraping de wol.jw.org, removido — ver CHANGELOG) produzia. */
 export interface SemanaWeb {
   ano: number;
   semana_iso: number;

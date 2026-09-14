@@ -1,11 +1,16 @@
 # Designações — Vida e Ministério
 
 App desktop offline (Tauri v2 + React + SQLite) para montar a programação de
-designações da reunião Vida e Ministério: busca a programação das próximas 8
-semanas em wol.jw.org, distribui as partes entre a congregação respeitando os
-critérios (anciãos/servos, homens, mulheres, batizados) e mantendo o número de
+designações da reunião Vida e Ministério: você importa o PDF da apostila
+(mwb) baixado direto do jw.org, o app lê a programação das semanas a partir
+dele, distribui as partes entre a congregação respeitando os critérios
+(anciãos/servos, homens, mulheres, batizados) e mantendo o número de
 designações equilibrado entre as pessoas, mostra um preview editável antes de
 gravar, e gera uma página imprimível no layout do modelo em PDF.
+
+O app nunca acessa a internet para buscar conteúdo da reunião — toda a
+importação acontece a partir do arquivo que você baixa manualmente, em
+conformidade com os termos de uso do jw.org.
 
 ## Rodando em desenvolvimento
 
@@ -22,13 +27,14 @@ npm run tauri dev
 
 ```bash
 cd src-tauri
-cargo test      # parser do wol.jw.org + balanceador de designações
+cargo test      # balanceador de designações
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
 
 ```bash
 npm run build    # tsc + build do frontend
+npm run test     # parser da apostila (PDF) e demais testes do frontend
 ```
 
 ## Build / releases
@@ -52,10 +58,11 @@ sistemas. Como o app não é assinado digitalmente:
 
 ## Estrutura
 
-- `src-tauri/src/wol/` — busca e interpreta a programação semanal em
-  wol.jw.org (HTML → estrutura de partes).
+- `src/lib/mwb/` — lê o PDF da apostila (mwb) importado pelo usuário e monta
+  a estrutura de partes da semana (PDF → texto, com recomposição de colunas
+  e acentos → partes).
 - `src-tauri/src/assign/` — regras de elegibilidade por tipo de parte e o
   algoritmo de designação balanceada.
 - `src-tauri/src/db.rs` — schema/migrations do SQLite.
-- `src/pages/` — Pessoas, Designação (preview + confirmação), Histórico,
-  Backup, Configurações e a página de impressão.
+- `src/pages/` — Pessoas, Designação (importação, preview + confirmação),
+  Histórico, Backup, Configurações e a página de impressão.

@@ -1,7 +1,7 @@
 use app_lib::assign::{
     gerar_atribuicoes, ConfiguracaoDesignacao, DesignacaoHistorica, ParteParaDesignar, Pessoa,
 };
-use app_lib::wol::TipoParte;
+use app_lib::tipos::TipoParte;
 use std::collections::HashMap;
 
 fn pessoa(id: i64, nome: &str, sexo: char, anciao: bool, servo: bool, batizado: bool) -> Pessoa {
