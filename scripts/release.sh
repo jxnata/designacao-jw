@@ -120,13 +120,13 @@ awk -v v="$new_version" '
 
 if [[ -f "$CHANGELOG" ]] && grep -q '^## \[Não lançado\]' "$CHANGELOG"; then
   echo "Fechando a seção [Não lançado] do $CHANGELOG como [$new_version]..."
-  release_year="$(date +%Y)"
+  release_date="$(date +%Y-%m-%d)"
   tmp="$(mktemp)"
-  awk -v v="$new_version" -v y="$release_year" '
+  awk -v v="$new_version" -v d="$release_date" '
     !done && /^## \[Não lançado\]/ {
       print
       print ""
-      print "## [" v "] — " y
+      print "## [" v "] — " d
       done = 1
       next
     }

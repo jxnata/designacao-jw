@@ -6,7 +6,7 @@ versionamento é [semver](https://semver.org/lang/pt-BR/).
 
 ## [Não lançado]
 
-## [2.0.0] — 2026
+## [2.0.0] — 2026-09-14
 
 ### Adicionado
 
