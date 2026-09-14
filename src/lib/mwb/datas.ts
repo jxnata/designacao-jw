@@ -80,9 +80,7 @@ export function interpretarCabecalho(linha: string, anoBase: number): CabecalhoS
   const inicio = new Date(Date.UTC(ano1, mes1 - 1, dia1));
   const fim = new Date(Date.UTC(ano2, mes2 - 1, dia2));
 
-  const intervalo_texto = temSegundo
-    ? `${dia1} DE ${nomeMes(mes1).toUpperCase()}–${dia2} DE ${nomeMes(mes2).toUpperCase()}`
-    : `${dia1}-${dia2} DE ${nomeMes(mes1).toUpperCase()}`;
+  const intervalo_texto = formatarIntervalo(inicio, fim);
 
   const resto = compacta.slice(m[0].length);
   const leituraM = /^([A-ZÇÃÕÁÉÍÓÚÂÊÔ]+)(\d{1,3})(?:-(\d{1,3}))?/.exec(resto);
@@ -95,6 +93,21 @@ export function interpretarCabecalho(linha: string, anoBase: number): CabecalhoS
 
 function nomeMes(n: number): string {
   return NOMES_MES[n] ?? "";
+}
+
+/** Formata o intervalo de datas de uma semana no mesmo texto que a apostila
+ * imprime no cabeçalho ("2-8 DE NOVEMBRO" ou, cruzando o mês,
+ * "30 DE NOVEMBRO–6 DE DEZEMBRO") — usado tanto ao interpretar o PDF quanto
+ * ao mapear o `.jwpub` (ver `jwpub-mapear.ts`), para os dois formatos
+ * produzirem o mesmo texto de exibição. */
+export function formatarIntervalo(inicio: Date, fim: Date): string {
+  const dia1 = inicio.getUTCDate();
+  const mes1 = inicio.getUTCMonth() + 1;
+  const dia2 = fim.getUTCDate();
+  const mes2 = fim.getUTCMonth() + 1;
+  return mes1 === mes2
+    ? `${dia1}-${dia2} DE ${nomeMes(mes1).toUpperCase()}`
+    : `${dia1} DE ${nomeMes(mes1).toUpperCase()}–${dia2} DE ${nomeMes(mes2).toUpperCase()}`;
 }
 
 function capitalizar(palavra: string): string {

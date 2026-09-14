@@ -3,7 +3,7 @@ import { AlertTriangle, ArrowLeft, CheckCircle2, FileUp, Loader2 } from "lucide-
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getConfig, importarSemanas } from "../lib/db";
-import { ErroValidacaoApostila, importarApostilaPdf } from "../lib/mwb";
+import { ErroValidacaoApostila, importarApostila } from "../lib/mwb";
 
 const URL_APOSTILA_PT = "https://www.jw.org/pt/biblioteca/jw-apostila-do-mes/";
 const URL_APOSTILA_LIBRAS = "https://www.jw.org/bzs/biblioteca/jw-apostila-do-mes/";
@@ -14,7 +14,7 @@ export default function ImportarSemanas() {
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const [arrastando, setArrastando] = useState(false);
-  const [processando, setProcessando] = useState(false);
+  const [processando, setProcessando] = useState<"jwpub" | "pdf" | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [resultado, setResultado] = useState<Resultado | null>(null);
   const [congregacaoSinais, setCongregacaoSinais] = useState<boolean | null>(null);
@@ -28,20 +28,22 @@ export default function ImportarSemanas() {
   async function processarArquivo(arquivo: File) {
     setErro(null);
     setResultado(null);
-    if (!arquivo.name.toLowerCase().endsWith(".pdf") && arquivo.type !== "application/pdf") {
-      setErro("Selecione o arquivo PDF da apostila baixado do jw.org.");
+    const nome = arquivo.name.toLowerCase();
+    const ehJwpub = nome.endsWith(".jwpub");
+    const ehPdf = nome.endsWith(".pdf") || arquivo.type === "application/pdf";
+    if (!ehJwpub && !ehPdf) {
+      setErro("Selecione o arquivo .jwpub ou o PDF da apostila baixado do jw.org.");
       return;
     }
-    setProcessando(true);
+    setProcessando(ehJwpub ? "jwpub" : "pdf");
     try {
-      const bytes = new Uint8Array(await arquivo.arrayBuffer());
-      const { semanas, aviso } = await importarApostilaPdf(bytes, congregacaoSinais ?? false);
+      const { semanas, aviso } = await importarApostila(arquivo, congregacaoSinais ?? false);
       const { importadas, ignoradas } = await importarSemanas(semanas);
       setResultado({ importadas, ignoradas, aviso });
     } catch (e) {
       setErro(e instanceof ErroValidacaoApostila ? e.message : String(e));
     } finally {
-      setProcessando(false);
+      setProcessando(null);
     }
   }
 
@@ -67,9 +69,12 @@ export default function ImportarSemanas() {
 
       <div className="mb-4 rounded border border-slate-200 bg-white p-4 text-sm text-slate-600">
         <p className="mb-2">
-          Baixe o PDF da apostila da reunião (
-          <em>Nossa Vida e Ministério Cristão</em>) direto do jw.org e importe o arquivo aqui — o app lê o
-          conteúdo do PDF, sem precisar buscar nada pela internet.
+          Baixe a apostila da reunião (<em>Nossa Vida e Ministério Cristão</em>) direto do jw.org e importe o
+          arquivo aqui — o app lê o conteúdo do arquivo, sem precisar buscar nada pela internet.
+        </p>
+        <p className="mb-2">
+          Prefira o arquivo <strong>JWPUB</strong> (o mesmo que o JW Library usa) — é mais confiável que o PDF.
+          O PDF continua funcionando como alternativa.
         </p>
         <button
           className="font-medium text-teal-700 underline hover:text-teal-800"
@@ -84,6 +89,10 @@ export default function ImportarSemanas() {
               : "Link da edição em português, de acordo com a configuração da congregação."}
           </p>
         )}
+        <p className="mt-2 text-xs text-slate-400">
+          Importante: não renomeie o arquivo JWPUB baixado — o app usa o nome original (algo como
+          "mwb_T_202601.jwpub") para identificar o idioma e a edição.
+        </p>
       </div>
 
       <div
@@ -100,12 +109,14 @@ export default function ImportarSemanas() {
         {processando ? (
           <>
             <Loader2 className="size-8 animate-spin text-teal-700" />
-            <p className="text-sm text-slate-600">Lendo e importando o PDF…</p>
+            <p className="text-sm text-slate-600">
+              {processando === "jwpub" ? "Abrindo o arquivo JWPUB… pode levar alguns segundos" : "Lendo e importando o PDF…"}
+            </p>
           </>
         ) : (
           <>
             <FileUp className="size-8 text-slate-400" />
-            <p className="text-sm text-slate-600">Arraste o PDF da apostila aqui</p>
+            <p className="text-sm text-slate-600">Arraste o JWPUB ou o PDF da apostila aqui</p>
             <p className="text-xs text-slate-400">ou</p>
             <button
               className="inline-flex items-center gap-1.5 rounded bg-teal-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-800"
@@ -116,7 +127,7 @@ export default function ImportarSemanas() {
             <input
               ref={inputRef}
               type="file"
-              accept="application/pdf,.pdf"
+              accept="application/pdf,.pdf,.jwpub"
               className="hidden"
               onChange={(e) => {
                 const arquivo = e.target.files?.[0];
@@ -140,7 +151,7 @@ export default function ImportarSemanas() {
           <p className="flex items-start gap-2">
             <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
             {resultado.importadas === 0
-              ? "Nenhuma semana nova — todas as semanas deste PDF já estavam importadas."
+              ? "Nenhuma semana nova — todas as semanas deste arquivo já estavam importadas."
               : `${resultado.importadas} ${resultado.importadas === 1 ? "semana importada" : "semanas importadas"}` +
                 (resultado.ignoradas > 0 ? ` (${resultado.ignoradas} já existiam).` : ".")}
           </p>
