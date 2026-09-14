@@ -23,6 +23,7 @@ PACKAGE_JSON="package.json"
 TAURI_CONF="src-tauri/tauri.conf.json"
 CARGO_TOML="src-tauri/Cargo.toml"
 CARGO_LOCK="src-tauri/Cargo.lock"
+CHANGELOG="CHANGELOG.md"
 
 bump=${1:-}
 if [[ -z "$bump" ]]; then
@@ -84,6 +85,18 @@ fi
 
 echo "Versão atual: $current_version"
 echo "Nova versão:  $new_version (tag $tag)"
+
+if [[ -f "$CHANGELOG" ]] && grep -q '^## \[Não lançado\]' "$CHANGELOG"; then
+  changelog_vazio="$(awk '/^## \[Não lançado\]/{flag=1;next}/^## /{flag=0}flag' "$CHANGELOG" | tr -d '[:space:]')"
+  if [[ -z "$changelog_vazio" ]]; then
+    echo "Aviso: a seção [Não lançado] do $CHANGELOG está vazia — nada para descrever nesta versão."
+    read -r -p "Continuar mesmo assim? [y/N] " confirm
+    [[ "$confirm" =~ ^[Yy]$ ]] || exit 1
+  fi
+else
+  echo "Aviso: não encontrei uma seção '## [Não lançado]' em $CHANGELOG; ele não será atualizado."
+fi
+
 read -r -p "Confirma o release? [y/N] " confirm
 [[ "$confirm" =~ ^[Yy]$ ]] || exit 1
 
@@ -105,6 +118,22 @@ awk -v v="$new_version" '
   { print }
 ' "$CARGO_TOML" >"$tmp" && mv "$tmp" "$CARGO_TOML"
 
+if [[ -f "$CHANGELOG" ]] && grep -q '^## \[Não lançado\]' "$CHANGELOG"; then
+  echo "Fechando a seção [Não lançado] do $CHANGELOG como [$new_version]..."
+  release_year="$(date +%Y)"
+  tmp="$(mktemp)"
+  awk -v v="$new_version" -v y="$release_year" '
+    !done && /^## \[Não lançado\]/ {
+      print
+      print ""
+      print "## [" v "] — " y
+      done = 1
+      next
+    }
+    { print }
+  ' "$CHANGELOG" >"$tmp" && mv "$tmp" "$CHANGELOG"
+fi
+
 if command -v cargo >/dev/null 2>&1; then
   echo "Atualizando $CARGO_LOCK..."
   (cd src-tauri && cargo update --workspace --offline >/dev/null 2>&1) || \
@@ -118,7 +147,7 @@ echo "Rodando npm install para sincronizar package-lock.json..."
 npm install --package-lock-only --silent
 
 echo "Commitando alterações de versão..."
-git add "$PACKAGE_JSON" package-lock.json "$TAURI_CONF" "$CARGO_TOML" "$CARGO_LOCK"
+git add "$PACKAGE_JSON" package-lock.json "$TAURI_CONF" "$CARGO_TOML" "$CARGO_LOCK" "$CHANGELOG"
 if git diff --cached --quiet; then
   echo "Nada para commitar (manifestos já estavam em $new_version) — seguindo direto para a tag."
 else

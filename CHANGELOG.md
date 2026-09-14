@@ -6,6 +6,8 @@ versionamento é [semver](https://semver.org/lang/pt-BR/).
 
 ## [Não lançado]
 
+## [2.0.0] — 2026
+
 ### Adicionado
 
 - **Importação da apostila em `.jwpub`**, o mesmo arquivo que o JW Library
